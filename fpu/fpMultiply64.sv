@@ -5,11 +5,8 @@
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	fpMultiply.v
+//	fpMultiply64.v
 //		- floating point multiplier
-//		- two cycle latency minimum (latency depends on precision)
-//		- can issue every clock cycle
-//		- parameterized width
 //		- IEEE 754 representation
 //
 //
@@ -58,46 +55,40 @@
 //	
 // ============================================================================
 
-import fp::*;
+import fp64Pkg::*;
 
-module fpMultiply(clk, ce, a, b, o, sign_exe, inf, overflow, underflow);
+module fpMultiply64(clk, ce, a, b, o, sign_exe, inf, overflow, underflow);
 input clk;
 input ce;
-input  [MSB:0] a, b;
-output [EX:0] o;
+input  FP64 a, b;
+output FP64X o;
 output sign_exe;
 output inf;
 output overflow;
 output underflow;
-parameter DELAY =
-  (FPWID == 128 ? 17 :
-  FPWID == 80 ? 17 :
-  FPWID == 64 ? 13 :
-  FPWID == 40 ? 8 :
-  FPWID == 32 ? 2 :
-  FPWID == 16 ? 2 : 2);
+parameter DELAY = 13;
 
-reg [EMSB:0] xo1;		// extra bit for sign
-reg [FX:0] mo1;
+reg [fp64Pkg::EMSB:0] xo1;		// extra bit for sign
+reg [fp64Pkg::FX:0] mo1;
 
 // constants
-wire [EMSB:0] infXp = {EMSB+1{1'b1}};	// infinite / NaN - all ones
+wire [fp64Pkg::EMSB:0] infXp = {EMSB+1{1'b1}};	// infinite / NaN - all ones
 // The following is the value for an exponent of zero, with the offset
 // eg. 8'h7f for eight bit exponent, 11'h7ff for eleven bit exponent, etc.
-wire [EMSB:0] bias = {1'b0,{EMSB{1'b1}}};	//2^0 exponent
+wire [fp64Pkg::EMSB:0] bias = {1'b0,{EMSB{1'b1}}};	//2^0 exponent
 // The following is a template for a quiet nan. (MSB=1)
-wire [FMSB:0] qNaN  = {1'b1,{FMSB{1'b0}}};
+wire [fp64Pkg::FMSB:0] qNaN  = {1'b1,{FMSB{1'b0}}};
 
 // variables
-reg [FX:0] fract1,fract1a;
-wire [FX:0] fracto;
-wire [EMSB+2:0] ex1;	// sum of exponents
-wire [EMSB  :0] ex2;
+reg [fp64Pkg::FX:0] fract1,fract1a;
+wire [fp64Pkg::FX:0] fracto;
+wire [fp64Pkg::EMSB+2:0] ex1;	// sum of exponents
+wire [fp64Pkg::EMSB  :0] ex2;
 
 // Decompose the operands
 wire sa, sb;			// sign bit
-wire [EMSB:0] xa, xb;	// exponent bits
-wire [FMSB+1:0] fracta, fractb;
+wire [fp64Pkg::EMSB:0] xa, xb;	// exponent bits
+wire [fp64Pkg::FMSB+1:0] fracta, fractb;
 wire a_dn, b_dn;			// a/b is denormalized
 wire aNan, bNan, aNan1, bNan1;
 wire az, bz;
@@ -116,8 +107,8 @@ wire aInf, bInf, aInf1, bInf1;
 // First clock
 // -----------------------------------------------------------
 
-fpDecomp u1a (.i(a), .sgn(sa), .exp(xa), .fract(fracta), .xz(a_dn), .vz(az), .inf(aInf), .nan(aNan) );
-fpDecomp u1b (.i(b), .sgn(sb), .exp(xb), .fract(fractb), .xz(b_dn), .vz(bz), .inf(bInf), .nan(bNan) );
+fpDecomp64 u1a (.i(a), .sgn(sa), .exp(xa), .fract(fracta), .xz(a_dn), .vz(az), .inf(aInf), .nan(aNan) );
+fpDecomp64 u1b (.i(b), .sgn(sb), .exp(xb), .fract(fractb), .xz(b_dn), .vz(bz), .inf(bInf), .nan(bNan) );
 
 // Compute the sum of the exponents.
 // correct the exponent for denormalized operands
@@ -129,55 +120,17 @@ assign ex1 = (az|bz) ? 0 : (xa|a_dn) + (xb|b_dn) - bias;
 assign ex1 = (az|bz) ? 0 : xa + xb - bias;
 `endif
 
-generate
-if (FPWID==128) begin
-  wire [255:0] fractoo;
-  mult128x128 umul1 (.clk(clk), .ce(ce), .a({16'b0,fracta}), .b({16'b0,fractb}), .o(fractoo));
-  always @(posedge clk)
-    if (ce) fract1 <= fractoo[224:0];
-end
-else if (FPWID==80) begin
-  wire [255:0] fractoo;
-  mult128x128 umul1 (.clk(clk), .ce(ce), .a({63'd0,fracta}), .b({63'd0,fractb}), .o(fractoo));
-  always @(posedge clk)
-    if (ce) fract1 <= fractoo[130:0];
-end
-else if (FPWID==64) begin
-  wire [127:0] fractoo;
-  mult64x64 umul1 (.clk(clk), .ce(ce), .a({11'd0,fracta}), .b({11'd0,fractb}), .o(fractoo));
-  always @(posedge clk)
-    if (ce) fract1 <= fractoo[106:0];
-end
-else if (FPWID==40) begin
-  wire [63:0] fractoo;
-  mult32x32 umul1 (.clk(clk), .ce(ce), .a({3'd0,fracta}), .b({3'd0,fractb}), .o(fractoo));
-  always @(posedge clk)
-    if (ce) fract1 <= fractoo[58:0];
-end
-else if (FPWID==32) begin
-  reg [23:0] p00,p11;
-  always @(posedge clk)
-  	if (ce) begin
-  	  p00 <= fracta[23: 0] * fractb[11: 0];
-  	  p11 <= fracta[23: 0] * fractb[23:12];
-  		fract1 <= {p11,12'b0} + p00;
-  	end
-end
-else begin
-	always @(posedge clk)
-    if (ce) begin
-    	fract1a <= fracta * fractb;
-      fract1 <= fract1a;
-    end
-end
-endgenerate
+wire [127:0] fractoo;
+mult64x64 umul1 (.clk(clk), .ce(ce), .a({11'd0,fracta}), .b({11'd0,fractb}), .o(fractoo));
+always @(posedge clk)
+  if (ce) fract1 <= fractoo[fp64Pkg::FX:0];
 
 // Status
 wire under1, over1;
-wire under = ex1[EMSB+2];	// exponent underflow
-wire over = (&ex1[EMSB:0] | ex1[EMSB+1]) & !ex1[EMSB+2];
+wire under = ex1[fp64Pkg::EMSB+2];	// exponent underflow
+wire over = (&ex1[fp64Pkg::EMSB:0] | ex1[fp64Pkg::EMSB+1]) & !ex1[fp64Pkg::EMSB+2];
 
-ft_delay #(.WID(EMSB+1),.DEP(DELAY)) u3 (.clk(clk), .ce(ce), .i(ex1[EMSB:0]), .o(ex2) );
+ft_delay #(.WID(fp64Pkg::EMSB+1),.DEP(DELAY)) u3 (.clk(clk), .ce(ce), .i(ex1[fp64Pkg::EMSB:0]), .o(ex2) );
 ft_delay #(.WID(1),.DEP(DELAY)) u2a (.clk(clk), .ce(ce), .i(aInf), .o(aInf1) );
 ft_delay #(.WID(1),.DEP(DELAY)) u2b (.clk(clk), .ce(ce), .i(bInf), .o(bInf1) );
 ft_delay #(.WID(1),.DEP(DELAY)) u6  (.clk(clk), .ce(ce), .i(under), .o(under1) );
@@ -185,12 +138,12 @@ ft_delay #(.WID(1),.DEP(DELAY)) u7  (.clk(clk), .ce(ce), .i(over), .o(over1) );
 
 // determine when a NaN is output
 wire qNaNOut;
-wire [FPWID-1:0] a1,b1;
+FP64 a1,b1;
 ft_delay #(.WID(1),.DEP(DELAY)) u5 (.clk(clk), .ce(ce), .i((aInf&bz)|(bInf&az)), .o(qNaNOut) );
 ft_delay #(.WID(1),.DEP(DELAY)) u14 (.clk(clk), .ce(ce), .i(aNan), .o(aNan1) );
 ft_delay #(.WID(1),.DEP(DELAY)) u15 (.clk(clk), .ce(ce), .i(bNan), .o(bNan1) );
-ft_delay #(.WID(FPWID),.DEP(DELAY))  u16 (.clk(clk), .ce(ce), .i(a), .o(a1) );
-ft_delay #(.WID(FPWID),.DEP(DELAY))  u17 (.clk(clk), .ce(ce), .i(b), .o(b1) );
+ft_delay #(.WID($bits(a)),.DEP(DELAY))  u16 (.clk(clk), .ce(ce), .i(a), .o(a1) );
+ft_delay #(.WID($bits(b)),.DEP(DELAY))  u17 (.clk(clk), .ce(ce), .i(b), .o(b1) );
 
 // -----------------------------------------------------------
 // Second clock
@@ -207,8 +160,8 @@ always @(posedge clk)
 		5'b01???:	xo1 = infXp;	// 'a' infinite
 		5'b001??:	xo1 = infXp;	// 'b' infinite
 		5'b0001?:	xo1 = infXp;	// result overflow
-		5'b00001:	xo1 = ex2[EMSB:0];//0;		// underflow
-		default:	xo1 = ex2[EMSB:0];	// situation normal
+		5'b00001:	xo1 = ex2[fp64Pkg::EMSB:0];//0;		// underflow
+		default:	xo1 = ex2[fp64Pkg::EMSB:0];	// situation normal
 		endcase
 
 // Force mantissa to zero when underflow or zero exponent when not supporting denormals.
@@ -219,8 +172,8 @@ always @(posedge clk)
 `else
 		casez({aNan1,bNan1,qNaNOut,aInf1,bInf1,over1|under1})
 `endif
-		6'b1?????:  mo1 = {1'b1,a1[FMSB:0],{FMSB+1{1'b0}}};
-    6'b01????:  mo1 = {1'b1,b1[FMSB:0],{FMSB+1{1'b0}}};
+		6'b1?????:  mo1 = {1'b1,a1[fp64Pkg::FMSB:0],{fp64Pkg::FMSB+1{1'b0}}};
+    6'b01????:  mo1 = {1'b1,b1[fp64Pkg::FMSB:0],{fp64Pkg::FMSB+1{1'b0}}};
 		6'b001???:	mo1 = {1'b1,qNaN|3'd4,{FMSB+1{1'b0}}};	// multiply inf * zero
 		6'b0001??:	mo1 = 0;	// mul inf's
 		6'b00001?:	mo1 = 0;	// mul inf's
@@ -233,33 +186,9 @@ delay1 u11 (.clk(clk), .ce(ce), .i(over1),  .o(overflow) );
 delay1 u12 (.clk(clk), .ce(ce), .i(over1),  .o(inf) );
 delay1 u13 (.clk(clk), .ce(ce), .i(under1), .o(underflow) );
 
-assign o = {so1,xo1,mo1};
+assign o.sign = so1;
+assign o.exp = xo1;
+assign o.sig = mo1;
 
 endmodule
 
-
-// Multiplier with normalization and rounding.
-
-module fpMultiplynr(clk, ce, a, b, o, rm, sign_exe, inf, overflow, underflow);
-input clk;
-input ce;
-input  [MSB:0] a, b;
-output [MSB:0] o;
-input [2:0] rm;
-output sign_exe;
-output inf;
-output overflow;
-output underflow;
-
-wire [EX:0] o1;
-wire sign_exe1, inf1, overflow1, underflow1;
-wire [MSB+3:0] fpn0;
-
-fpMultiply  u1 (clk, ce, a, b, o1, sign_exe1, inf1, overflow1, underflow1);
-fpNormalize u2(.clk(clk), .ce(ce), .under_i(underflow1), .i(o1), .o(fpn0) );
-fpRound     u3(.clk(clk), .ce(ce), .rm(rm), .i(fpn0), .o(o) );
-delay2      #(1)   u4(.clk(clk), .ce(ce), .i(sign_exe1), .o(sign_exe));
-delay2      #(1)   u5(.clk(clk), .ce(ce), .i(inf1), .o(inf));
-delay2      #(1)   u6(.clk(clk), .ce(ce), .i(overflow1), .o(overflow));
-delay2      #(1)   u7(.clk(clk), .ce(ce), .i(underflow1), .o(underflow));
-endmodule

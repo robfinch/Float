@@ -1,3 +1,4 @@
+`timescale 1ns / 1ps
 // ============================================================================
 //        __
 //   \\__/ o\    (C) 2020-2022  Robert Finch, Waterloo
@@ -112,7 +113,6 @@ assign bz = bu.exp==14'h0 && bu.sig==136'd0;
 
 wire under, over;
 wire [15:0] sum_ex = au.exp + bu.exp - bias;
-reg [15:0] sum_ex;
 reg sx0;
 wire done1;
 assign under = &sum_ex[15:14];

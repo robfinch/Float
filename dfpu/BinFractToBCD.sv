@@ -6,8 +6,9 @@
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	DDBinToBCD.sv
-//  Uses the Dubble Dabble algorithm
+//	BinFractToBCD.sv
+//	- convert binary fraction to BCD
+//
 //
 // BSD 3-Clause License
 // Redistribution and use in source and binary forms, with or without
@@ -34,99 +35,54 @@
 // CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//                                                                          
-// ============================================================================
 //
-module DDBinToBCD(rst, clk, ld, bin, bcd, done);
-parameter WID = 128;
-parameter DEP = 2;		// cascade depth
-localparam BCDWID = ((WID+(WID-4)/3)+3) & -4;
+// ============================================================================
+
+module BinFractToBCD(rst, clk, ld, i, o, done);
+parameter WID=116;
+localparam OWID = ((WID+(WID-4)/3+3) & -4);
 input rst;
 input clk;
 input ld;
-input [WID-1:0] bin;
-output reg [BCDWID-1:0] bcd;
+input [WID-1:0] i;
+output reg [OWID-1:0] o;
 output reg done;
 
-integer k;
-genvar n,g;
-reg [WID-1:0] binw;								// working binary value
-reg [BCDWID-1:0] bcdwt;
-reg [BCDWID-1:0] bcdw [0:DEP-1];	// working bcd value
-reg [7:0] bitcnt;
-reg [2:0] state;
-parameter IDLE = 3'd0;
-parameter CHK5 = 3'd1;
-parameter SHFT = 3'd2;
-parameter DONE = 3'd3;
-
-function [BCDWID-1:0] fnRow;
-input [BCDWID-1:0] i;
-input lsb;
-begin
-	fnRow = 'd0;
-	for (k = 0; k < BCDWID; k = k + 4)
-		if (((i >> k) & 4'hF) > 4'd4)
-			fnRow = fnRow | (((i >> k) & 4'hF) + 4'd3) << k;
-		else
-			fnRow = fnRow | ((i >> k) & 4'hf) << k;
-	fnRow = {fnRow,lsb};
-end
-endfunction
-
+reg [5:0] iter;
+reg [WID+4-1:0] bin;
+reg [WID+4-1:0] p;
 always_comb
-	bcdw[0] = fnRow(bcdwt,binw[WID-1]);
-generate begin : gRows
-	for (n = 1; n < DEP; n = n + 1)
-		always_comb
-			bcdw[n] = fnRow(bcdw[n-1],binw[WID-1-n]);
-end
-endgenerate
+	p = (bin + (bin << 2'd2)) << 2'd1;
+
+reg [1:0] state;
+parameter IDLE = 2'd0;
+parameter CVT = 2'd1;
 
 always_ff @(posedge clk)
-	if (WID % DEP) begin
-		$display("Width must be a multiple of DEP, DEP must be at least 2.");
-		$finish;
-	end
-
-always_ff @(posedge clk)
-if (rst) begin
-	state <= IDLE;
+if (rst)
 	done <= 1'b1;
-	bcdwt <= 'd0;
-	binw <= 'd0;
-	bitcnt <= 'd0;
-end
 else begin
 	if (ld) begin
+		iter <= OWID/4;
+		bin <= {4'h0,i[WID-5:0],4'h0};
+		o <= i[WID-1:WID-4];	// capture leading one if present.
+		state <= CVT;
 		done <= 1'b0;
-		bitcnt <= (WID+DEP-1)/DEP;
-		binw <= bin;
-		bcdwt <= 'd0;
-		state <= SHFT;
 	end
-	else
 	case(state)
 	IDLE:	;
-	SHFT:
+	CVT:
 		begin
-			bitcnt <= bitcnt - 2'd1;
-			if (bitcnt==8'd1) begin
-				state <= DONE;
+			iter <= iter - 2'd1;
+			o <= {o,p[WID+3:WID]};
+			bin <= {4'h0,p[WID-1:0]};
+			if (iter==6'd2) begin
+				done <= 1'b1;
+				state <= IDLE;
 			end
-			bcdwt <= bcdw[DEP-1];
-			binw <= binw << DEP;
 		end
-	DONE:
-		begin
-			bcd <= bcdwt;
-			done <= 1'b1;
-			state <= IDLE;
-		end
-	default:
-		state <= IDLE;
+	default:	state <= IDLE;
 	endcase
 end
-
 
 endmodule

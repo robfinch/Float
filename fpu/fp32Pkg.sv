@@ -1,13 +1,11 @@
-`timescale 1ns / 1ps
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2022  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2020-2022  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	DDBinToBCD.sv
-//  Uses the Dubble Dabble algorithm
+//	fp32Pkg.sv
 //
 // BSD 3-Clause License
 // Redistribution and use in source and binary forms, with or without
@@ -37,96 +35,76 @@
 //                                                                          
 // ============================================================================
 //
-module DDBinToBCD(rst, clk, ld, bin, bcd, done);
-parameter WID = 128;
-parameter DEP = 2;		// cascade depth
-localparam BCDWID = ((WID+(WID-4)/3)+3) & -4;
-input rst;
-input clk;
-input ld;
-input [WID-1:0] bin;
-output reg [BCDWID-1:0] bcd;
-output reg done;
 
-integer k;
-genvar n,g;
-reg [WID-1:0] binw;								// working binary value
-reg [BCDWID-1:0] bcdwt;
-reg [BCDWID-1:0] bcdw [0:DEP-1];	// working bcd value
-reg [7:0] bitcnt;
-reg [2:0] state;
-parameter IDLE = 3'd0;
-parameter CHK5 = 3'd1;
-parameter SHFT = 3'd2;
-parameter DONE = 3'd3;
+package fp32Pkg;
 
-function [BCDWID-1:0] fnRow;
-input [BCDWID-1:0] i;
-input lsb;
-begin
-	fnRow = 'd0;
-	for (k = 0; k < BCDWID; k = k + 4)
-		if (((i >> k) & 4'hF) > 4'd4)
-			fnRow = fnRow | (((i >> k) & 4'hF) + 4'd3) << k;
-		else
-			fnRow = fnRow | ((i >> k) & 4'hf) << k;
-	fnRow = {fnRow,lsb};
-end
-endfunction
+`define FPWID   32
 
-always_comb
-	bcdw[0] = fnRow(bcdwt,binw[WID-1]);
-generate begin : gRows
-	for (n = 1; n < DEP; n = n + 1)
-		always_comb
-			bcdw[n] = fnRow(bcdw[n-1],binw[WID-1-n]);
-end
-endgenerate
+`define	QINFOS		23'h7FC000		// info
+`define QSUBINF		4'd1
+`define QINFDIV		4'd2
+`define QZEROZERO	4'd3
+`define QINFZERO	4'd4
+`define QSQRTINF	4'd5
+`define QSQRTNEG	4'd6
 
-always_ff @(posedge clk)
-	if (WID % DEP) begin
-		$display("Width must be a multiple of DEP, DEP must be at least 2.");
-		$finish;
-	end
+parameter QINFDIV		= 4'd2;
+parameter QZEROZERO	= 4'd3;
+parameter QSQRTINF	= 4'd5;
+parameter QSQRTNEG	= 4'd6;
 
-always_ff @(posedge clk)
-if (rst) begin
-	state <= IDLE;
-	done <= 1'b1;
-	bcdwt <= 'd0;
-	binw <= 'd0;
-	bitcnt <= 'd0;
-end
-else begin
-	if (ld) begin
-		done <= 1'b0;
-		bitcnt <= (WID+DEP-1)/DEP;
-		binw <= bin;
-		bcdwt <= 'd0;
-		state <= SHFT;
-	end
-	else
-	case(state)
-	IDLE:	;
-	SHFT:
-		begin
-			bitcnt <= bitcnt - 2'd1;
-			if (bitcnt==8'd1) begin
-				state <= DONE;
-			end
-			bcdwt <= bcdw[DEP-1];
-			binw <= binw << DEP;
-		end
-	DONE:
-		begin
-			bcd <= bcdwt;
-			done <= 1'b1;
-			state <= IDLE;
-		end
-	default:
-		state <= IDLE;
-	endcase
-end
+`define	QSUBINFS	31'h7FC00001	// - infinity - infinity
+`define QINFDIVS	31'h7FC00002	// - infinity / infinity
+`define QZEROZEROS	31'h7FC00003	// - zero / zero
+`define QINFZEROS	31'h7FC00004	// - infinity X zero
+`define QSQRTINFS	31'h7FC00005	// - square root of infinity
+`define QSQRTNEGS	31'h7FC00006	// - square root of negaitve number
 
+`define	POINT5S		32'h3F000000
+`define ZEROS			32'h00000000
 
-endmodule
+`define AIN			3'd0
+`define BIN			3'd1
+`define CIN			3'd2
+`define RES			3'd3
+`define POINT5	3'd4
+`define ZERO		3'd5
+
+`define SUPPORT_DENORMALS   1'b1
+//`define MIN_LATENCY		1'b1
+
+parameter FPWID = `FPWID;
+
+// This file contains defintions for fields to ease dealing with different fp
+// widths. Some of the code still needs to be modified to support widths
+// other than standard 32,64 or 80 bit.
+localparam MSB = FPWID-1;
+localparam EMSB = 7;
+localparam FMSB = 22;
+localparam FX = (FMSB+2)*2;	// the MSB of the expanded fraction
+localparam EX = FX + 1 + EMSB + 1 + 1 - 1;
+
+typedef struct packed
+{
+	logic sign;
+	logic [EMSB:0] exp;
+	logic [FMSB:0] sig;
+} FP32;
+
+typedef struct packed
+{
+	logic sign;
+	logic [EMSB:0] exp;
+	logic [FX:0] sig;
+} FP32X;
+
+// Normalizer output, three extra significand bits
+
+typedef struct packed
+{
+	logic sign;
+	logic [EMSB:0] exp;
+	logic [FMSB+3:0] sig;
+} FP32N;
+
+endpackage

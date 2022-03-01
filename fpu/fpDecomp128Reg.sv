@@ -5,7 +5,7 @@
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	fpDecompReg.v
+//	fpDecomp128Reg.v
 //    - decompose floating point value with registered outputs
 //    - parameterized width
 //
@@ -25,14 +25,14 @@
 //                                                                          
 // ============================================================================
 
-import fp::*;
+import fp128Pkg::*;
 
-module fpDecomp(i, sgn, exp, man, fract, xz, mz, vz, inf, xinf, qnan, snan, nan);
-input [MSB:0] i;
+module fpDecomp128(i, sgn, exp, man, fract, xz, mz, vz, inf, xinf, qnan, snan, nan);
+input FP128 i;
 output sgn;
-output [EMSB:0] exp;
-output [FMSB:0] man;
-output [FMSB+1:0] fract;	// mantissa with hidden bit recovered
+output [fp128Pkg::EMSB:0] exp;
+output [fp128Pkg::FMSB:0] man;
+output [fp128Pkg::FMSB+1:0] fract;	// mantissa with hidden bit recovered
 output xz;		// denormalized - exponent is zero
 output mz;		// mantissa is zero
 output vz;		// value is zero (both exponent and mantissa are zero)
@@ -43,32 +43,32 @@ output snan;	// signalling nan
 output nan;
 
 // Decompose input
-assign sgn = i[MSB];
-assign exp = i[MSB-1:FMSB+1];
-assign man = i[FMSB:0];
+assign sgn = i.sign;
+assign exp = i.exp;
+assign man = i.sig;
 assign xz = !(|exp);	// denormalized - exponent is zero
 assign mz = !(|man);	// mantissa is zero
 assign vz = xz & mz;	// value is zero (both exponent and mantissa are zero)
 assign inf = &exp & mz;	// all ones exponent, zero mantissa
 assign xinf = &exp;
-assign qnan = &exp &  man[FMSB];
-assign snan = &exp & !man[FMSB] & !mz;
+assign qnan = &exp &  man[fp128Pkg::FMSB];
+assign snan = &exp & !man[fp128Pkg::FMSB] & !mz;
 assign nan = &exp & !mz;
-assign fract = {!xz,i[FMSB:0]};
+assign fract = {!xz,i.sig};
 
 endmodule
 
 
-module fpDecompReg(clk, ce, i, o, sgn, exp, man, fract, xz, mz, vz, inf, xinf, qnan, snan, nan);
+module fpDecomp128Reg(clk, ce, i, o, sgn, exp, man, fract, xz, mz, vz, inf, xinf, qnan, snan, nan);
 input clk;
 input ce;
-input [MSB:0] i;
+input FP128 i;
 
-output reg [MSB:0] o;
+output reg FP128 o;
 output reg sgn;
-output reg [EMSB:0] exp;
-output reg [FMSB:0] man;
-output reg [FMSB+1:0] fract;	// mantissa with hidden bit recovered
+output reg [fp128Pkg::EMSB:0] exp;
+output reg [fp128Pkg::FMSB:0] man;
+output reg [fp128Pkg::FMSB+1:0] fract;	// mantissa with hidden bit recovered
 output reg xz;		// denormalized - exponent is zero
 output reg mz;		// mantissa is zero
 output reg vz;		// value is zero (both exponent and mantissa are zero)
@@ -82,18 +82,18 @@ output reg nan;
 always @(posedge clk)
 	if (ce) begin
 		o <= i;
-		sgn = i[MSB];
-		exp = i[MSB-1:FMSB+1];
-		man = i[FMSB:0];
+		sgn = i.sign;
+		exp = i.exp;
+		man = i.sig;
 		xz = !(|exp);	// denormalized - exponent is zero
 		mz = !(|man);	// mantissa is zero
 		vz = xz & mz;	// value is zero (both exponent and mantissa are zero)
 		inf = &exp & mz;	// all ones exponent, zero mantissa
 		xinf = &exp;
-		qnan = &exp &  man[FMSB];
-		snan = &exp & !man[FMSB] & !mz;
+		qnan = &exp &  man[fp128Pkg::FMSB];
+		snan = &exp & !man[fp128Pkg::FMSB] & !mz;
 		nan = &exp & !mz;
-		fract = {|exp,i[FMSB:0]};
+		fract = {|exp,i.sig};
 	end
 
 endmodule

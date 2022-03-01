@@ -1,3 +1,4 @@
+`timescale 1ns / 1ps
 // ============================================================================
 //        __
 //   \\__/ o\    (C) 2020-2022  Robert Finch, Waterloo
@@ -119,7 +120,6 @@ reg az2, bz2;
 reg xa_gt_xb2;
 reg [N*4-1:0] siga2, sigb2;
 reg sigeq, siga_gt_sigb;
-reg xa_gt_xb2;
 reg expeq;
 reg sxo2;
 

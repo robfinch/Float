@@ -25,14 +25,14 @@
 //                                                                          
 // ============================================================================
 
-import fp::*;
+import fp64Pkg::*;
 
-module fpDecomp(i, sgn, exp, man, fract, xz, mz, vz, inf, xinf, qnan, snan, nan);
-input [MSB:0] i;
+module fpDecomp64(i, sgn, exp, man, fract, xz, mz, vz, inf, xinf, qnan, snan, nan);
+input [63:0] i;
 output sgn;
-output [EMSB:0] exp;
-output [FMSB:0] man;
-output [FMSB+1:0] fract;	// mantissa with hidden bit recovered
+output [fp64Pkg::EMSB:0] exp;
+output [fp64Pkg::FMSB:0] man;
+output [fp64Pkg::FMSB+1:0] fract;	// mantissa with hidden bit recovered
 output xz;		// denormalized - exponent is zero
 output mz;		// mantissa is zero
 output vz;		// value is zero (both exponent and mantissa are zero)
@@ -43,32 +43,32 @@ output snan;	// signalling nan
 output nan;
 
 // Decompose input
-assign sgn = i[MSB];
-assign exp = i[MSB-1:FMSB+1];
-assign man = i[FMSB:0];
+assign sgn = i[fp64Pkg::MSB];
+assign exp = i[fp64Pkg::MSB-1:fp64Pkg::FMSB+1];
+assign man = i[fp64Pkg::FMSB:0];
 assign xz = !(|exp);	// denormalized - exponent is zero
 assign mz = !(|man);	// mantissa is zero
 assign vz = xz & mz;	// value is zero (both exponent and mantissa are zero)
 assign inf = &exp & mz;	// all ones exponent, zero mantissa
 assign xinf = &exp;
-assign qnan = &exp &  man[FMSB];
-assign snan = &exp & !man[FMSB] & !mz;
+assign qnan = &exp &  man[fp64Pkg::FMSB];
+assign snan = &exp & !man[fp64Pkg::FMSB] & !mz;
 assign nan = &exp & !mz;
 assign fract = {!xz,i[FMSB:0]};
 
 endmodule
 
 
-module fpDecompReg(clk, ce, i, o, sgn, exp, man, fract, xz, mz, vz, inf, xinf, qnan, snan, nan);
+module fpDecomp64Reg(clk, ce, i, o, sgn, exp, man, fract, xz, mz, vz, inf, xinf, qnan, snan, nan);
 input clk;
 input ce;
-input [MSB:0] i;
+input [fp64Pkg::MSB:0] i;
 
-output reg [MSB:0] o;
+output reg [fp64Pkg::MSB:0] o;
 output reg sgn;
-output reg [EMSB:0] exp;
-output reg [FMSB:0] man;
-output reg [FMSB+1:0] fract;	// mantissa with hidden bit recovered
+output reg [fp64Pkg::EMSB:0] exp;
+output reg [fp64Pkg::FMSB:0] man;
+output reg [fp64Pkg::FMSB+1:0] fract;	// mantissa with hidden bit recovered
 output reg xz;		// denormalized - exponent is zero
 output reg mz;		// mantissa is zero
 output reg vz;		// value is zero (both exponent and mantissa are zero)
@@ -82,18 +82,18 @@ output reg nan;
 always @(posedge clk)
 	if (ce) begin
 		o <= i;
-		sgn = i[MSB];
-		exp = i[MSB-1:FMSB+1];
-		man = i[FMSB:0];
+		sgn = i[fp64Pkg::MSB];
+		exp = i[fp64Pkg::MSB-1:fp64Pkg::FMSB+1];
+		man = i[fp64Pkg::FMSB:0];
 		xz = !(|exp);	// denormalized - exponent is zero
 		mz = !(|man);	// mantissa is zero
 		vz = xz & mz;	// value is zero (both exponent and mantissa are zero)
 		inf = &exp & mz;	// all ones exponent, zero mantissa
 		xinf = &exp;
-		qnan = &exp &  man[FMSB];
-		snan = &exp & !man[FMSB] & !mz;
+		qnan = &exp &  man[fp64Pkg::FMSB];
+		snan = &exp & !man[fp64Pkg::FMSB] & !mz;
 		nan = &exp & !mz;
-		fract = {|exp,i[FMSB:0]};
+		fract = {|exp,i[fp64Pkg::FMSB:0]};
 	end
 
 endmodule

@@ -61,16 +61,14 @@
 //---------------
 //  199999999   <- second row result
 
-module BCDSub8NClk(clk, ld, a, b, o, ci, co, done);
+module BCDSub8NClk(clk, a, b, o, ci, co);
 parameter N=33;
 input clk;
-input ld;
 input [N*8-1:0] a;
 input [N*8-1:0] b;
 output reg [N*8-1:0] o;
 input ci;
 output reg co;
-output reg done;
 
 reg [N-1:0] c [0:2];
 wire [N*8-1:0] o1 [0:2];
@@ -81,6 +79,9 @@ genvar g,k;
 generate begin : gBCDadd
 for (g = 0; g < N; g = g + 1) begin
 	for (k = 0; k < 3; k = k + 1) begin
+		initial begin
+			c[k][g] <= 'b0;
+		end
 		BCDSub u1 (
 			.ci(k==0 && g==0 ? ci : 1'b0),
 			.a(k==0 ? a[g*8+7:g*8] : o2[k-1][g*8+7:g*8]),
@@ -97,7 +98,7 @@ end
 always_ff @(posedge clk)
 begin
 	o <= o1[2];
-	co <= c[2][N-1];
+	co <= c[2][N-1]|c[1][N-1]|c[0][N-1];
 end
 end
 endgenerate

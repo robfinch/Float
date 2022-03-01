@@ -1,6 +1,6 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2020-2021  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2020-2022  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
@@ -36,6 +36,10 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 // ============================================================================
+
+//`define KARATSUBA	1
+
+`ifdef KARATSUBA
 
 module mult64x64(clk, ce, a, b, o);
 input clk;
@@ -117,3 +121,36 @@ always @(posedge clk)
 	if (ce) o <= {z2d,z0d} + {z1,32'd0};
 
 endmodule
+
+`else
+
+// This version of the multiply has a parameterized pipeline depth and allows
+// the tools to perform the multiply. Relies on the ability of tools to retime.
+
+module mult64x64(clk, ce, a, b, o);
+parameter DEP = 11;
+input clk;
+input ce;
+input [63:0] a;
+input [63:0] b;
+output reg [127:0] o;
+
+reg [127:0] prod [0:DEP-1];
+reg [127:0] prd;
+integer n;
+
+always_ff @(posedge clk)
+	if (ce) prd <= a * b;
+always_ff @(posedge clk)
+	if (ce) prod[0] <= prd;
+	
+always_ff @(posedge clk)
+	for (n = 0; n < DEP - 1; n = n + 1)
+		if (ce) prod[n+1] <= prod[n];
+
+always_ff @(posedge clk)
+	if(ce) o <= prod[DEP-1];
+
+endmodule
+
+`endif

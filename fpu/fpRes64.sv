@@ -34,15 +34,13 @@
 //
 // ============================================================================
 //
-`include "fpConfig.sv"
+import fp64Pkg::*;
 
-module fpRes(clk, ce, a, o);
-parameter FPWID = 128;
-`include "fpSize.sv"
+module fpRes64(clk, ce, a, o);
 input clk;
 input ce;
-input [FPWID-1:0] a;
-output [FPWID-1:0] o;
+input FP32 a;
+output FP32 o;
 
 // This table encodes two endpoints k0, k1 of a piece-wise linear
 // approximation to the reciprocal in the range [1.0,2.0).
@@ -1078,7 +1076,7 @@ end
 wire sa;
 wire [EMSB:0] xa;
 wire [FMSB:0] ma;
-fpDecomp #(FPWID) u1 (.i(a), .sgn(sa), .exp(xa), .man(ma), .fract(), .xz(), .vz(), .xinf(), .inf(), .nan() );
+fpDecomp64 u1 (.i(a), .sgn(sa), .exp(xa), .man(ma), .fract(), .xz(), .vz(), .xinf(), .inf(), .nan() );
 
 wire [EMSB+1:0] bias = {1'b0,{EMSB{1'b1}}};
 wire [EMSB+1:0] x1 = xa - bias;
@@ -1100,14 +1098,11 @@ wire [15:0] eps = ma[FMSB-10:FMSB-10-15];
 wire [31:0] p = k1 * eps;
 reg [15:0] r0;
 always @(posedge clk)
-	if(ce) r0 <= k0 - (p >> 26);
-assign o = {sa3,exp3,r0[14:0],{FMSB+2-16{1'b0}}};
+	if(ce) r0 <= k0 - (p >> 5'd26);
 
-always @*
-	if (FPWID < 48) begin
-		$display("Reciprocal estimate needs at least 48 bit floats.");
-		$stop;
-	end
+assign o.sign = sa3;
+assign o.exp = exp3;
+assign o = {r0[14:0],{FMSB+2-16{1'b0}}};
 
 endmodule
 

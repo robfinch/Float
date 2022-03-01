@@ -194,31 +194,6 @@ endgenerate
 
 endmodule
 			 
-module BCDSub8NClk(clk, a, b, o, ci, co);
-parameter N=33;
-input clk;
-input [N*8-1:0] a;
-input [N*8-1:0] b;
-output [N*8-1:0] o;
-input ci;
-output co;
-
-reg [N:0] c;
-wire [N:0] d;
-assign c[0] = ci;
-assign co = c[N];
-
-genvar g;
-generate begin : gBCDsub
-for (g = 0; g < N; g = g + 1) begin
-	BCDSub u1 (c[g],a[g*8+7:g*8],b[g*8+7:g*8],o[g*8+7:g*8],d[g+1]);
-
-	always_ff @(posedge clk)
-		c[g+1] <= d[g+1];
-end
-end
-endgenerate
-endmodule
 
 module BCDAddAdjust(i,o,c);
 input [4:0] i;

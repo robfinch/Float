@@ -59,7 +59,7 @@ parameter DONE = 2'd2;
 
 reg [3:0] cnt;				// iteration count
 reg [7:0] dcnt;				// digit count
-reg [9:0] clkcnt;
+reg [15:0] clkcnt;
 reg [5:0] digcnt;
 reg [FPWID*2-1:0] qi = 0;
 reg [FPWID+4-1:0] ri = 0;
@@ -72,16 +72,18 @@ wire [FPWID+4-1:0] dif1;
 (* retiming_forward = 1 *)
 wire co1;
 
-BCDSub8NClk #(.N((N+1)/2)) ubcds1
+generate begin : gSub
+BCDSub8NClk #(.N((N+2)/2)) ubcds1
 (
 	.clk(clk),
-	.a(ri),
-	.b({4'd0,bi}),
+	.a(~N[0] ? {ri,4'h0} : ri),
+	.b(~N[0] ? {4'd0,bi,4'h0} : {4'd0,bi}),
 	.o(dif),
 	.ci(1'b0),
 	.co(co)
 );
-
+end
+endgenerate
 
 always @(posedge clk)
 begin
@@ -91,7 +93,7 @@ SUBN:
 		digcnt <= digcnt - 1'd1;
 		if (digcnt=='d0) begin
 			clkcnt <= clkcnt + 1'd1;
-			digcnt <= 6'd3;
+			digcnt <= 6'd4;
 			if (co) begin
 				ri <= {ri,qi[FPWID*2-1:FPWID*2-4]};
 				qi <= {qi[FPWID*2-5:0],cnt};
@@ -132,8 +134,9 @@ SUBN:
 						end
 					end
 				end
-				else begin
-					ri <= dif;
+				else
+				begin
+					ri <= N[0] ? dif : dif[FPWID+4-1:4];
 					cnt <= cnt + 1'd1;
 				end
 			end
@@ -151,8 +154,8 @@ endcase
 if (ld) begin
 	clkcnt <= 10'd0;
 	cnt <= 4'd0;
-	digcnt <= 6'd3;
-	dcnt <= (FPWID*2)/4;
+	digcnt <= 6'd4;
+	dcnt <= $ceil((FPWID*2)/4);
 	qi <= {a,{FPWID{1'd0}}};
 	ri <= {FPWID{1'd0}};
 	bi <= b;
@@ -169,23 +172,23 @@ module dfdiv_tb();
 
 reg clk;
 reg ld;
-reg [107:0] a, b;
-wire [215:0] q;
-wire [107:0] r;
+reg [135:0] a, b;
+wire [271:0] q;
+wire [135:0] r;
 wire [7:0] lzcnt;
 
 initial begin
 	clk = 1'b0;
 	ld = 1'b0;
-	a = 108'h099_00000000_00000000_00000000;
-	b = 108'h560_00000000_00000000_00000000;
+	a = 136'h10_00000000_00000000_00000000_00000000;
+	b = 136'h20_00000000_00000000_00000000_00000000;
 	#20 ld = 1'b1;
 	#40 ld = 1'b0;
 end
 
 always #5 clk = ~clk;
 
-dfdiv #(.N(27)) u1 (
+dfdiv #(.N(34)) u1 (
 	.clk(clk),
 	.ld(ld), 
 	.a(a),

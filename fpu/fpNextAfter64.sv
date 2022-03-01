@@ -1,13 +1,13 @@
-`timescale 1ns / 1ps
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2022  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2019-2022  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	DDBinToBCD.sv
-//  Uses the Dubble Dabble algorithm
+//	fpNextAfter64.v
+//		- floating point nextafter()
+//		- return next representable value
 //
 // BSD 3-Clause License
 // Redistribution and use in source and binary forms, with or without
@@ -36,97 +36,61 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //                                                                          
 // ============================================================================
-//
-module DDBinToBCD(rst, clk, ld, bin, bcd, done);
-parameter WID = 128;
-parameter DEP = 2;		// cascade depth
-localparam BCDWID = ((WID+(WID-4)/3)+3) & -4;
-input rst;
+
+import fp64Pkg::*;
+
+module fpNextAfter64(clk, ce, a, b, o);
 input clk;
-input ld;
-input [WID-1:0] bin;
-output reg [BCDWID-1:0] bcd;
-output reg done;
+input ce;
+input FP64 a;
+input FP64 b;
+output reg FP64 o;
 
-integer k;
-genvar n,g;
-reg [WID-1:0] binw;								// working binary value
-reg [BCDWID-1:0] bcdwt;
-reg [BCDWID-1:0] bcdw [0:DEP-1];	// working bcd value
-reg [7:0] bitcnt;
-reg [2:0] state;
-parameter IDLE = 3'd0;
-parameter CHK5 = 3'd1;
-parameter SHFT = 3'd2;
-parameter DONE = 3'd3;
+wire [4:0] cmp_o;
+wire nana, nanb;
+wire xza, mza;
 
-function [BCDWID-1:0] fnRow;
-input [BCDWID-1:0] i;
-input lsb;
-begin
-	fnRow = 'd0;
-	for (k = 0; k < BCDWID; k = k + 4)
-		if (((i >> k) & 4'hF) > 4'd4)
-			fnRow = fnRow | (((i >> k) & 4'hF) + 4'd3) << k;
+fpCompare64 u1 (.a(a), .b(b), .o(cmp_o), .nanx(nanxab) );
+fpDecomp64 u2 (.i(a), .sgn(), .exp(), .man(), .fract(), .xz(xza), .mz(mza), .vz(), .inf(), .xinf(), .qnan(), .snan(), .nan(nana));
+fpDecomp64 u3 (.i(b), .sgn(), .exp(), .man(), .fract(), .xz(), .mz(), .vz(), .inf(), .xinf(), .qnan(), .snan(), .nan(nanb));
+wire FP64 ap1 = a + 2'd1;
+wire FP64 am1 = a - 2'd1;
+wire [fp64Pkg::EMSB:0] infXp = {fp64Pkg::EMSB+1{1'b1}};
+
+always_ff  @(posedge clk)
+if (ce) begin
+	o <= a;
+	casez({a.sign,cmp_o})
+	6'b?1????:	o <= nana ? a : b;	// Unordered
+	6'b????1?:	o <= a;							// a,b Equal
+	6'b0????1:
+		if (ap1.exp==infXp) begin
+			o.sign <= a.sign;
+			o.exp <= a.exp;
+			o.sig <= {fp64Pkg::FMSB+1{1'b0}};
+		end
 		else
-			fnRow = fnRow | ((i >> k) & 4'hf) << k;
-	fnRow = {fnRow,lsb};
-end
-endfunction
-
-always_comb
-	bcdw[0] = fnRow(bcdwt,binw[WID-1]);
-generate begin : gRows
-	for (n = 1; n < DEP; n = n + 1)
-		always_comb
-			bcdw[n] = fnRow(bcdw[n-1],binw[WID-1-n]);
-end
-endgenerate
-
-always_ff @(posedge clk)
-	if (WID % DEP) begin
-		$display("Width must be a multiple of DEP, DEP must be at least 2.");
-		$finish;
-	end
-
-always_ff @(posedge clk)
-if (rst) begin
-	state <= IDLE;
-	done <= 1'b1;
-	bcdwt <= 'd0;
-	binw <= 'd0;
-	bitcnt <= 'd0;
-end
-else begin
-	if (ld) begin
-		done <= 1'b0;
-		bitcnt <= (WID+DEP-1)/DEP;
-		binw <= bin;
-		bcdwt <= 'd0;
-		state <= SHFT;
-	end
-	else
-	case(state)
-	IDLE:	;
-	SHFT:
-		begin
-			bitcnt <= bitcnt - 2'd1;
-			if (bitcnt==8'd1) begin
-				state <= DONE;
-			end
-			bcdwt <= bcdw[DEP-1];
-			binw <= binw << DEP;
+			o <= ap1;
+	6'b0????0:
+		if (xza && mza)
+			;
+		else
+			o <= am1;
+	6'b1????0:
+		if (ap1.exp==infXp) begin
+			o.sign <= a.sign;
+			o.exp <= a.exp;
+			o.sig <= {fp64Pkg::FMSB+1{1'b0}};
 		end
-	DONE:
-		begin
-			bcd <= bcdwt;
-			done <= 1'b1;
-			state <= IDLE;
-		end
-	default:
-		state <= IDLE;
+		else
+			o <= ap1;
+	6'b1????1:
+		if (xza && mza)
+			;
+		else
+			o <= am1;
+	default:	o <= a;
 	endcase
 end
-
 
 endmodule

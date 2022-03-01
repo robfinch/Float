@@ -1,0 +1,67 @@
+
+
+module DPFBSDivide128();
+
+BCDAdd8NClk u1
+(
+	.clk(),
+	.ci(1'b0),
+	.a(high),
+	.b(low),
+	.o(hpl),
+	.co()
+);
+
+BCDSRL u2
+(
+	.ci(1'b0), 
+	.i(hpl),
+	.o(hpld2),
+	.co()
+);
+
+reg [135:0] high;
+reg [135:0] low;
+
+high = {res,{28{4'h9}}};
+low = {res,{28{4'h0}}};
+
+00-99
+51
+
+num1 = 8899/50	// largest
+num2 = 8800/50
+num3 = 8800/59	// smallest
+num4 = 8899/59
+
+N = (high + low) / 2
+
+p = N * D;
+
+if (p > dividend)
+	high = N;
+else if (p < dividend)
+	low = N;
+else
+	done;
+
+	LDH		t0,DFZERO
+	LDH		t1,DFMAX
+labIter:
+	DFADD	t2,t1,t0
+	DFSRL	t2,t2
+	DFMUL	t3,t2,a1
+	CMP		t4,t2,a0
+	BBS		DFEQ,t4,labEq
+	BBS		DFLT,t4,labLt
+	MOV		t1,t2
+	BRA		labIter
+labLt:
+	MOV		t0,t2
+	BRA		labIter
+labEq:
+	MOV		a0,t2
+	RET
+
+
+endmodule

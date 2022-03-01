@@ -1,13 +1,13 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2020  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2020-2022  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	mult128x128.sv
+//	mult32x32.sv
 //  - Karatsuba multiply
-//  - 15 cycle latency
+//  - six clock cycles
 //
 // BSD 3-Clause License
 // Redistribution and use in source and binary forms, with or without
@@ -41,62 +41,60 @@
 
 `ifdef KARATSUBA
 
-module mult128x128(clk, ce, a, b, o);
+module mult32x32(clk, ce, a, b, o);
 input clk;
 input ce;
-input [127:0] a;
-input [127:0] b;
-output reg [255:0] o;
+input [31:0] a;
+input [31:0] b;
+output reg [63:0] o;
 
-reg [63:0] a2, b2;
-reg [64:0] a1, b1;
-reg [127:0] z0, z2, z0a, z2a, z0b, z2b, z0c, z2c, z0d, z2d, p3, p4;
-reg [128:0] z1; // extra bit for carry
-reg sgn2, sgn10;
-wire sgn9;
+reg [15:0] a2, b2;
+reg [16:0] a1, b1;
+reg [31:0] z0, z2, z0a, z2a, z0b, z2b, z0c, z2c, z0d, z2d, p3, p4;
+reg [32:0] z1;  // extra bit for carry
+reg sgn2, sgn3, sgn4;
 
 always @(posedge clk)
-	if (ce) a1 <= a[63: 0] - a[127:64];  // x0-x1
+	if (ce) a1 <= a[15: 0] - a[31:16];  // x0-x1
 always @(posedge clk)
-	if (ce) b1 <= b[127:64] - b[63: 0];  // y1-y0
+	if (ce) b1 <= b[31:16] - b[15: 0];  // y1-y0
 always @(posedge clk)
-	if (ce) a2 <= a1[64] ? -a1 : a1;
+	if (ce) a2 <= a1[16] ? -a1 : a1;
 always @(posedge clk)
-	if (ce) b2 <= b1[64] ? -b1 : b1;
+	if (ce) b2 <= b1[16] ? -b1 : b1;
 always @(posedge clk)
-  if (ce) sgn2 <= a1[64]^b1[64];
-
-ft_delay #(.WID(1), .DEP(12)) udl1 (.clk(clk), .ce(ce), .i(sgn2), .o(sgn9));
+  if (ce) sgn2 <= a1[16]^b1[16];
 always @(posedge clk)
-  if (ce) sgn10 <= sgn9;
-
-// 11 cycle latency
-mult64x64 u1 (
+  if (ce) sgn3 <= sgn2;
+always @(posedge clk)
+  if (ce) sgn4 <= sgn3;
+ 
+mult16x16 u1 (
   .clk(clk),
   .ce(ce),
-  .a(a[127:64]),
-  .b(b[127:64]),
+  .a(a[31:16]),
+  .b(b[31:16]),
   .o(z2)          // z2 = x1 * y1
 );
 
-mult64x64 u2 (
+mult16x16 u2 (
   .clk(clk),
   .ce(ce),
-  .a(a[63:0]),
-  .b(b[63:0]),
+  .a(a[15:0]),
+  .b(b[15:0]),
   .o(z0)          // z0 = x0 * y0
 );
 
-mult64x64 u3 (
+mult16x16 u3 (
   .clk(clk),
   .ce(ce),
-  .a(a2[63:0]),
-  .b(b2[63:0]),
+  .a(a2[15:0]),
+  .b(b2[15:0]),
   .o(p3)        // p3 = abs(x0-x1) * abs(y1-y0)
 );
 
 always @(posedge clk)
-	if (ce) p4 <= sgn9 ? -p3 : p3;
+	if (ce) p4 <= sgn3 ? -p3 : p3;
 
 always @(posedge clk)
   if (ce) z2a <= z2;
@@ -111,14 +109,14 @@ always @(posedge clk)
 always @(posedge clk)
   if (ce) z0c <= z0b;
 always @(posedge clk)
-	if (ce) z1 <= {{128{sgn10}},p4} + z2c + z0c;
+	if (ce) z1 <= {{32{sgn4}},p4} + z2c + z0c;
 
 always @(posedge clk)
   if (ce) z2d <= z2c;
 always @(posedge clk)
   if (ce) z0d <= z0c;
 always @(posedge clk)
-	if (ce) o <= {z2d,z0d} + {z1,64'd0};
+	if (ce) o <= {z2d,z0d} + {z1,16'd0};
 
 endmodule
 
@@ -127,16 +125,16 @@ endmodule
 // This version of the multiply has a parameterized pipeline depth and allows
 // the tools to perform the multiply. Relies on the ability of tools to retime.
 
-module mult128x128(clk, ce, a, b, o);
-parameter DEP = 18;
+module mult32x32(clk, ce, a, b, o);
+parameter DEP = 6;
 input clk;
 input ce;
-input [127:0] a;
-input [127:0] b;
-output reg [255:0] o;
+input [31:0] a;
+input [31:0] b;
+output reg [63:0] o;
 
-reg [255:0] prod [0:DEP-1];
-reg [255:0] prd;
+reg [31:0] prod [0:DEP-1];
+reg [31:0] prd;
 integer n;
 
 always_ff @(posedge clk)
