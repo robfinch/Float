@@ -37,7 +37,7 @@
 //
 // ============================================================================
 
-//`define KARATSUBA	1
+`define KARATSUBA	1
 
 `ifdef KARATSUBA
 
@@ -50,7 +50,8 @@ output reg [255:0] o;
 
 reg [63:0] a2, b2;
 reg [64:0] a1, b1;
-reg [127:0] z0, z2, z0a, z2a, z0b, z2b, z0c, z2c, z0d, z2d, p3, p4;
+reg [127:0] z0, z2, z0a, z2a, z0b, z2b, z0c, z2c, z0d, z2d, p3;
+reg [128:0] p4;
 reg [128:0] z1; // extra bit for carry
 reg sgn2, sgn10;
 wire sgn9;
@@ -111,7 +112,7 @@ always @(posedge clk)
 always @(posedge clk)
   if (ce) z0c <= z0b;
 always @(posedge clk)
-	if (ce) z1 <= {{128{sgn10}},p4} + z2c + z0c;
+	if (ce) z1 <= {{128{p4[128]}},p4} + z2c + z0c;
 
 always @(posedge clk)
   if (ce) z2d <= z2c;

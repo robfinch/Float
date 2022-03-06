@@ -41,32 +41,39 @@ reg [23:0] cnt;
 
 reg [127:0] a, b;
 wire [255:0] o;
+wire [255:0] p = a * b;
 
 integer outfile;
 initial begin
   a = $urandom(1);
+  b = $urandom(1);
 	// Initialize Inputs
 	clk = 1;
 	cnt = 0;
 	// Wait 100 ns for global reset to finish
-	#1000000 
-	$fclose(outfile);
-	$finish;
+	#100000000 $fclose(outfile);
+	#100 $finish;
 end
 	
 
 always #5 clk = ~clk;
 
-mult128x128 u1 (clk, 1'b1, a, b, o);
+//mult128x128 u1 (clk, 1'b1, a, b, o);
+mult128x128seq u2 (clk, cnt[8:0]==9'd2, a, b, o);
 
 always @(posedge clk)
 begin
   cnt <= cnt + 1;
-  case(cnt[23:5])
+  case(cnt[23:9])
+  0:
+    begin
+      a <= 128'h00a;
+      b <= 128'h00a;
+    end
   1:
     begin
-      a <= 128'd10;
-      b <= 128'd10;
+      a <= 128'h00a786bb752275222b913c4e93db9923;
+      b <= 128'h44f3a2773f6cd5714108b38cbf9ed32f;
     end
   2:
     begin
@@ -79,7 +86,7 @@ begin
       b <= 128'd11;
     end 
   default:
-    if (cnt[4:0]==5'd0) begin
+    if (cnt[8:0]==5'd0) begin
       a[31:0] <= $urandom();
       b[31:0] <= $urandom();
       if (cnt[23:5] > 19'h200) begin
@@ -98,10 +105,10 @@ begin
   endcase
 end
 
-initial outfile = $fopen("d:/cores2020/rtf64/v2/rtl/verilog/cpu/fpu/test_bench/mult128x128_tvo.txt", "wb");
+initial outfile = $fopen("d:/cores2022/rf6809/rtl/fpu/test_bench/mult128x128_tvo.txt", "wb");
   always @(posedge clk) begin
-    if (cnt[4:0]==5'h1F)
-     $fwrite(outfile, "%c%h\t%h\t%h\t%h\n",o!=a*b ? "*" : " ",a,b,o, a*b);
+    if (cnt[8:0]==9'h140)
+     $fwrite(outfile, "%c%h\t%h\t%h\t%h\n",o!=p ? "*" : " ",a,b,o, p);
   end
 
 endmodule
