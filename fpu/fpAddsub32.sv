@@ -64,8 +64,8 @@ wire xaInf, xbInf;
 wire aInf, bInf;
 wire aNan, bNan;
 
-wire [fp32Pkg::EMSB:0] xad = xa|adn;	// operand a exponent, compensated for denormalized numbers
-wire [fp32Pkg::EMSB:0] xbd = xb|bdn; // operand b exponent, compensated for denormalized numbers
+wire [fp32Pkg::EMSB:0] xad = xa|(adn&~az);	// operand a exponent, compensated for denormalized numbers
+wire [fp32Pkg::EMSB:0] xbd = xb|(bdn&~bz); // operand b exponent, compensated for denormalized numbers
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 // Clock #1

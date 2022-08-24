@@ -101,7 +101,7 @@ reg xcInf2;
 always @(posedge clk)
 	if (ce) abz2 <= az1|bz1;
 always @(posedge clk)
-	if (ce) ex2 <= (xa1|a_dn1) + (xb1|b_dn1) - bias;
+	if (ce) ex2 <= (xa1|(a_dn1&~a1z)) + (xb1|(b_dn1&~b1z)) - bias;
 always @(posedge clk)
 	if (ce) xc2 <= (xc1|c_dn1);
 always @(posedge clk)

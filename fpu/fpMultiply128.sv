@@ -117,7 +117,7 @@ fpDecomp128 u1b (.i(b), .sgn(sb), .exp(xb), .fract(fractb), .xz(b_dn), .vz(bz), 
 // adjust the sum by the exponent offset (subtract 127)
 // mul: ex1 = xa + xb,	result should always be < 1ffh
 `ifdef SUPPORT_DENORMALS
-assign ex1 = (az|bz) ? 0 : (xa|a_dn) + (xb|b_dn) - bias;
+assign ex1 = (az|bz) ? 0 : (xa|(a_dn&~az)) + (xb|(b_dn&~bz)) - bias;
 `else
 assign ex1 = (az|bz) ? 0 : xa + xb - bias;
 `endif

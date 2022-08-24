@@ -147,9 +147,9 @@ reg qNaNOut;
 
 always_ff @(posedge clk)
 `ifndef GOLDSCHMIDT
-  if (ce) ex1 <= (xa|a_dn) - (xb|b_dn) + bias + FMSB + (FADD-1) - lzcnt - 8'd1;
+  if (ce) ex1 <= (xa|(a_dn&~az)) - (xb|(b_dn&~bz)) + bias + FMSB + (FADD-1) - lzcnt - 8'd1;
 `else
-  if (ce) ex1 <= (xa|a_dn) - (xb|b_dn) + bias + FMSB - lzcnt + 8'd4;
+  if (ce) ex1 <= (xa|(a_dn&~az)) - (xb|(b_dn&~bz)) + bias + FMSB - lzcnt + 8'd4;
 `endif
 
 always_ff @(posedge clk)
