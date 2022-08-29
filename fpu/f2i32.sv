@@ -1,11 +1,11 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2006-2020  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2006-2022  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	f2i.v
+//	f2i32.sv
 //		- convert floating point to integer
 //		- single cycle latency floating point unit
 //		- parameterized width
@@ -30,9 +30,9 @@
 //
 // ============================================================================
 
-import fp::*;
+import fp32Pkg::*;
 
-module f2i(clk, ce, op, i, o, overflow);
+module f2i32(clk, ce, op, i, o, overflow);
 input clk;
 input ce;
 input op;					// 1 = signed, 0 = unsigned

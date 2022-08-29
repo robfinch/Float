@@ -5,6 +5,11 @@
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
+//	fpRes32.sv
+//    - floating point reciprocal estimate unit
+//    - three cycle latency
+//    - IEEE 754 representation
+//
 //
 // BSD 3-Clause License
 // Redistribution and use in source and binary forms, with or without
@@ -31,9 +36,9 @@
 // CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//
+//                                                                          
 // ============================================================================
-//
+
 import fp32Pkg::*;
 
 module fpRes32(clk, ce, a, o);
@@ -1077,7 +1082,7 @@ end
 wire sa;
 wire [EMSB:0] xa;
 wire [FMSB:0] ma;
-fpDecomp #(FPWID) u1 (.i(a), .sgn(sa), .exp(xa), .man(ma), .fract(), .xz(), .vz(), .xinf(), .inf(), .nan() );
+fpDecomp32 u1 (.i(a), .sgn(sa), .exp(xa), .man(ma), .fract(), .xz(), .vz(), .xinf(), .inf(), .nan() );
 
 wire [EMSB+1:0] bias = {1'b0,{EMSB{1'b1}}};
 wire [EMSB+1:0] x1 = xa - bias;

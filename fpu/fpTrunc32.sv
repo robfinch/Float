@@ -77,7 +77,7 @@ always_comb
 	else
 		man = i.sig & mask;
 
-always @(posedge clk)
+always_ff @(posedge clk)
 	if (ce) begin
 		if (exp < zeroXp)
 			o <= 1'd0;
