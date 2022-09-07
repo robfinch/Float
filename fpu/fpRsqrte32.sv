@@ -8374,7 +8374,7 @@ wire [7:0] exp = luto[16:9];
 wire [22:0] man = {luto[8:0],14'd0};
 always_comb
 	if (s2)
-		o1 <= {1'b0,`QSQRTNEG};
+		o1 <= {1'b0,QSQRTNEG};
 	else
 		o1 = {1'b0,exp,man};
 

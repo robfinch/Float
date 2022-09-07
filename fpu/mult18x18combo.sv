@@ -1,15 +1,12 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2019-2022  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2022  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	fpTrunc32.sv
-//		- convert floating point to integer (chop off fractional bits)
-//		- single cycle latency floating point unit
-//		- IEEE 754 representation
-//
+//	mult18x18combo.sv
+//  - this should typically synthesize to a single DSP multiplier
 //
 // BSD 3-Clause License
 // Redistribution and use in source and binary forms, with or without
@@ -36,56 +33,15 @@
 // CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//                                                                          
+//
 // ============================================================================
 
-import fp32Pkg::*;
-
-module fpTrunc32(clk, ce, i, o, overflow);
-input clk;
-input ce;
-input FP32 i;
-output FP32 o;
-output overflow;
-
-
-integer n;
-FP32 maxInt;
-assign maxInt.sign = 1'b0;
-assign maxInt.exp = 8'hFE;
-assign maxInt.sig = 23'h7FFFFF;			// maximum unsigned integer value
-wire [EMSB:0] zeroXp = {EMSB{1'b1}};	// simple constant - value of exp for zero
-
-// Decompose fp value
-reg sgn;									// sign
-reg [EMSB:0] exp;
-reg [FMSB:0] man;
-reg [FMSB:0] mask;
-
-wire [7:0] shamt = FMSB - (exp - zeroXp);
-always_comb
-for (n = 0; n <= FMSB; n = n +1)
-	mask[n] = (n > shamt);
+module mult18x18combo(a, b, o);
+input [17:0] a;
+input [17:0] b;
+output reg [35:0] o ='d0;
 
 always_comb
-	sgn = i.sign;
-always_comb
-	exp = i.exp;
-always_comb
-	if (exp > zeroXp + FMSB)
-		man = i.sig;
-	else
-		man = i.sig & mask;
-
-always_ff @(posedge clk)
-	if (ce) begin
-		if (exp < zeroXp)
-			o <= 1'd0;
-		else begin
-			o.sign <= sgn;
-			o.exp <= exp;
-			o.sig <= man;
-		end
-	end
-
+  o <= a * b;
+  
 endmodule

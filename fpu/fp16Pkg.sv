@@ -1,15 +1,11 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2019-2022  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2020-2022  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	fpTrunc32.sv
-//		- convert floating point to integer (chop off fractional bits)
-//		- single cycle latency floating point unit
-//		- IEEE 754 representation
-//
+//	fp16Pkg.sv
 //
 // BSD 3-Clause License
 // Redistribution and use in source and binary forms, with or without
@@ -38,54 +34,77 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //                                                                          
 // ============================================================================
+//
 
-import fp32Pkg::*;
+package fp16Pkg;
 
-module fpTrunc32(clk, ce, i, o, overflow);
-input clk;
-input ce;
-input FP32 i;
-output FP32 o;
-output overflow;
+`define FPWID   16
 
+`define	QINFOS		10'h3F0		// info
+`define QSUBINF		4'd1
+`define QINFDIV		4'd2
+`define QZEROZERO	4'd3
+`define QINFZERO	4'd4
+`define QSQRTINF	4'd5
+`define QSQRTNEG	4'd6
 
-integer n;
-FP32 maxInt;
-assign maxInt.sign = 1'b0;
-assign maxInt.exp = 8'hFE;
-assign maxInt.sig = 23'h7FFFFF;			// maximum unsigned integer value
-wire [EMSB:0] zeroXp = {EMSB{1'b1}};	// simple constant - value of exp for zero
+parameter QINFDIV		= 4'd2;
+parameter QZEROZERO	= 4'd3;
+parameter QSQRTINF	= 4'd5;
+parameter QSQRTNEG	= 4'd6;
 
-// Decompose fp value
-reg sgn;									// sign
-reg [EMSB:0] exp;
-reg [FMSB:0] man;
-reg [FMSB:0] mask;
+`define	QSUBINFS	16'b0111111000000001	// - infinity - infinity
+`define QINFDIVS	16'b0111111000000010	// - infinity / infinity
+`define QZEROZEROS	16'b0111111000000011	// - zero / zero
+`define QINFZEROS	16'b0111111000000100	// - infinity X zero
+`define QSQRTINFS	16'b0111111000000101	// - square root of infinity
+`define QSQRTNEGS	16'b0111111000000110	// - square root of negaitve number
 
-wire [7:0] shamt = FMSB - (exp - zeroXp);
-always_comb
-for (n = 0; n <= FMSB; n = n +1)
-	mask[n] = (n > shamt);
+`define	POINT5S		16'b0011110000000000
+`define ZEROS			16'b0000000000000000
 
-always_comb
-	sgn = i.sign;
-always_comb
-	exp = i.exp;
-always_comb
-	if (exp > zeroXp + FMSB)
-		man = i.sig;
-	else
-		man = i.sig & mask;
+`define AIN			3'd0
+`define BIN			3'd1
+`define CIN			3'd2
+`define RES			3'd3
+`define POINT5	3'd4
+`define ZERO		3'd5
 
-always_ff @(posedge clk)
-	if (ce) begin
-		if (exp < zeroXp)
-			o <= 1'd0;
-		else begin
-			o.sign <= sgn;
-			o.exp <= exp;
-			o.sig <= man;
-		end
-	end
+`define SUPPORT_DENORMALS   1'b1
+//`define MIN_LATENCY		1'b1
 
-endmodule
+parameter FPWID = `FPWID;
+
+// This file contains defintions for fields to ease dealing with different fp
+// widths. Some of the code still needs to be modified to support widths
+// other than standard 32,64 or 80 bit.
+localparam MSB = FPWID-1;
+localparam EMSB = 4;
+localparam FMSB = 9;
+localparam FX = (FMSB+2)*2;	// the MSB of the expanded fraction
+localparam EX = FX + 1 + EMSB + 1 + 1 - 1;
+
+typedef struct packed
+{
+	logic sign;
+	logic [EMSB:0] exp;
+	logic [FMSB:0] sig;
+} FP16;
+
+typedef struct packed
+{
+	logic sign;
+	logic [EMSB:0] exp;
+	logic [FX:0] sig;
+} FP16X;
+
+// Normalizer output, three extra significand bits
+
+typedef struct packed
+{
+	logic sign;
+	logic [EMSB:0] exp;
+	logic [FMSB+3:0] sig;
+} FP16N;
+
+endpackage
