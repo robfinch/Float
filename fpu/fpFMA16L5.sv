@@ -80,9 +80,9 @@ wire az1, bz1, cz1;
 wire aInf1, bInf1, cInf1;
 reg op1;
 
-fpDecomp32Reg u1a (.i(a), .sgn(sa1), .exp(xa1), .fract(fracta1), .xz(a_dn1), .vz(az1), .inf(aInf1), .nan(aNan1) );
-fpDecomp32Reg u1b (.i(b), .sgn(sb1), .exp(xb1), .fract(fractb1), .xz(b_dn1), .vz(bz1), .inf(bInf1), .nan(bNan1) );
-fpDecomp32Reg u1c (.i(c), .sgn(sc1), .exp(xc1), .fract(fractc1), .xz(c_dn1), .vz(cz1), .inf(cInf1), .nan(cNan1) );
+fpDecomp16Reg u1a (.i(a), .sgn(sa1), .exp(xa1), .fract(fracta1), .xz(a_dn1), .vz(az1), .inf(aInf1), .nan(aNan1) );
+fpDecomp16Reg u1b (.i(b), .sgn(sb1), .exp(xb1), .fract(fractb1), .xz(b_dn1), .vz(bz1), .inf(bInf1), .nan(bNan1) );
+fpDecomp16Reg u1c (.i(c), .sgn(sc1), .exp(xc1), .fract(fractc1), .xz(c_dn1), .vz(cz1), .inf(cInf1), .nan(cNan1) );
 
 always_ff @(posedge clk)
 	if (ce) op1 <= op;
