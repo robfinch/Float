@@ -5,7 +5,7 @@
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	f2i32.sv
+//	f2i128.sv
 //		- convert floating point to integer
 //		- single cycle latency floating point unit
 //		- parameterized width
@@ -30,9 +30,9 @@
 //
 // ============================================================================
 
-import fp32Pkg::*;
+import fp128Pkg::*;
 
-module f2i32(clk, ce, op, i, o, overflow);
+module f2i128(clk, ce, op, i, o, overflow);
 input clk;
 input ce;
 input op;					// 1 = signed, 0 = unsigned
@@ -69,7 +69,7 @@ always_ff @(posedge clk)
 			o3 <= maxInt;
 		// value between 1/2 and 1 - round up
 		else if (exp==zeroXp-1)
-			o3 <= 32'd1;
+			o3 <= 128'd1;
 		// value > 1
 		else
 			o3 <= o2;

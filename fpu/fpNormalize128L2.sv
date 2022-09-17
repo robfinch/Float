@@ -5,7 +5,7 @@
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	fpNormalize16L2.sv
+//	fpNormalize128L2.sv
 //    - floating point normalization unit
 //    - two cycle latency
 //    - IEEE 754 representation
@@ -51,13 +51,13 @@
 // to be negative. A right shift is needed.
 // ============================================================================
 
-import fp16Pkg::*;
+import fp128Pkg::*;
 
-module fpNormalize16L2(clk, ce, i, o, under_i, under_o, inexact_o);
+module fpNormalize128L2(clk, ce, i, o, under_i, under_o, inexact_o);
 input clk;
 input ce;
-input FP16X i;		// expanded format input
-output FP16N o;		// normalized output + guard, sticky and round bits, + 1 whole digit
+input FP128X i;		// expanded format input
+output FP128N o;		// normalized output + guard, sticky and round bits, + 1 whole digit
 input under_i;
 output reg under_o;
 output reg inexact_o;
@@ -66,12 +66,12 @@ integer n;
 // ----------------------------------------------------------------------------
 // No Clock required
 // ----------------------------------------------------------------------------
-reg [fp16Pkg::EMSB:0] xo0;
+reg [fp128Pkg::EMSB:0] xo0;
 reg so0;
 
-always @*
+always_comb
 	xo0 <= i.exp;
-always @*
+always_comb
 	so0 <= i.sign;		// sign doesn't change
 
 // ----------------------------------------------------------------------------
@@ -79,14 +79,14 @@ always @*
 // - Capture exponent information
 // ----------------------------------------------------------------------------
 reg xInf1a, xInf1b, xInf1c;
-FP16X i1;
+FP128X i1;
 
 always_comb
 	i1 <= i;
 always_comb
 	xInf1a <= &xo0 & !under_i;
 always_comb
-	xInf1b <= &xo0[fp16Pkg::EMSB:1] & !under_i;
+	xInf1b <= &xo0[fp128Pkg::EMSB:1] & !under_i;
 always_comb
 	xInf1c = &xo0;
 
@@ -98,7 +98,7 @@ always_comb
 // set, then increment the exponent and no shift is needed.
 // ----------------------------------------------------------------------------
 reg xInf2c, xInf2b;
-reg [fp16Pkg::EMSB:0] xo2;
+reg [fp128Pkg::EMSB:0] xo2;
 reg incExpByOne2, incExpByTwo2;
 reg under2;
 always_comb
@@ -111,9 +111,9 @@ always_comb
 	under2 <= under_i;
 
 always_comb
-	incExpByTwo2 <= !xInf1b & i1[fp16Pkg::FX];
+	incExpByTwo2 <= !xInf1b & i1[fp128Pkg::FX];
 always_comb
-	incExpByOne2 <= !xInf1a & i1[fp16Pkg::FX-1];
+	incExpByOne2 <= !xInf1a & i1[fp128Pkg::FX-1];
 
 // ----------------------------------------------------------------------------
 // Clock #3
@@ -123,8 +123,8 @@ always_comb
 
 reg incExpByTwo3;
 reg incExpByOne3;
-FP16X i3;
-reg [fp16Pkg::EMSB:0] xo3;
+FP128X i3;
+reg [fp128Pkg::EMSB:0] xo3;
 reg zeroMan3;
 reg xInf3c;
 reg under3;
@@ -142,14 +142,14 @@ always_ff @(posedge clk)
 always_ff @(posedge clk)
 	if (ce) so3 <= so0;
 
-wire [fp16Pkg::EMSB+1:0] xv3a = xo2 + {incExpByTwo2,1'b0};
-wire [fp16Pkg::EMSB+1:0] xv3b = xo2 + incExpByOne2;
+wire [fp128Pkg::EMSB+1:0] xv3a = xo2 + {incExpByTwo2,1'b0};
+wire [fp128Pkg::EMSB+1:0] xv3b = xo2 + incExpByOne2;
 
 always_ff @(posedge clk)
 	if (ce) xo3 <= xo2 + (incExpByTwo2 ? 2'd2 : incExpByOne2 ? 2'd1 : 2'd0);
 
 always_ff @(posedge clk)
-	if (ce) zeroMan3 <= ((xv3b[fp16Pkg::EMSB+1]|| &xv3b[fp16Pkg::EMSB:0])||(xv3a[fp16Pkg::EMSB+1]| &xv3a[fp16Pkg::EMSB:0]))
+	if (ce) zeroMan3 <= ((xv3b[fp128Pkg::EMSB+1]|| &xv3b[fp128Pkg::EMSB:0])||(xv3a[fp128Pkg::EMSB+1]| &xv3a[fp128Pkg::EMSB:0]))
 							 && !under2 && !xInf2c;
 
 // ----------------------------------------------------------------------------
@@ -160,23 +160,23 @@ always_ff @(posedge clk)
 // - create sticky bit
 // ----------------------------------------------------------------------------
 
-reg [fp16Pkg::FMSB+5:0] mo4;
+reg [fp128Pkg::FMSB+5:0] mo4;
 reg inexact4;
 
 always_comb
 casez({zeroMan3,incExpByTwo3,incExpByOne3})
 3'b1??:	mo4 <= 1'd0;
-3'b01?:	mo4 <= {i3[fp16Pkg::FX:fp16Pkg::FMSB],|i3[fp16Pkg::FMSB-1:0]};
-3'b001:	mo4 <= {i3[fp16Pkg::FX-1:fp16Pkg::FMSB-1],|i3[fp16Pkg::FMSB-2:0]};
-default:	mo4 <= {i3[fp16Pkg::FX-2:fp16Pkg::FMSB-2],|i3[fp16Pkg::FMSB-3:0]};
+3'b01?:	mo4 <= {i3[fp128Pkg::FX:fp128Pkg::FMSB],|i3[fp128Pkg::FMSB-1:0]};
+3'b001:	mo4 <= {i3[fp128Pkg::FX-1:fp128Pkg::FMSB-1],|i3[fp128Pkg::FMSB-2:0]};
+default:	mo4 <= {i3[fp128Pkg::FX-2:fp128Pkg::FMSB-2],|i3[fp128Pkg::FMSB-3:0]};
 endcase
 
 always_comb
 casez({zeroMan3,incExpByTwo3,incExpByOne3})
 3'b1??:	inexact4 <= 1'd0;
-3'b01?:	inexact4 <= |i3[fp16Pkg::FMSB+1:0];
-3'b001:	inexact4 <= |i3[fp16Pkg::FMSB:0];
-default:	inexact4 <= |i3[fp16Pkg::FMSB-1:0];
+3'b01?:	inexact4 <= |i3[fp128Pkg::FMSB+1:0];
+3'b001:	inexact4 <= |i3[fp128Pkg::FMSB:0];
+default:	inexact4 <= |i3[fp128Pkg::FMSB-1:0];
 endcase
 
 // ----------------------------------------------------------------------------
@@ -184,7 +184,7 @@ endcase
 // - count leading zeros
 // ----------------------------------------------------------------------------
 reg [7:0] leadingZeros5;
-reg [fp16Pkg::EMSB:0] xo5;
+reg [fp128Pkg::EMSB:0] xo5;
 reg xInf5;
 always_comb
 	xo5 <= xo3;
@@ -233,7 +233,7 @@ always_comb
 begin
   got_one = 1'b0;
   lzc = 8'h00;
-  for (n = fp16Pkg::FMSB+5; n >= 0; n = n - 1) begin
+  for (n = fp128Pkg::FMSB+5; n >= 0; n = n - 1) begin
     if (!got_one) begin
       if (mo4[n])
         got_one = 1'b1;
@@ -246,7 +246,7 @@ always_comb
   leadingZeros5 <= lzc;
 `else
 always_comb
-casez(mo4[fp16Pkg::FMSB+5:fp16Pkg::FMSB+4])
+casez(mo4[fp128Pkg::FMSB+5:fp128Pkg::FMSB+4])
 2'b1?:  leadingZeros5 <= 8'd0;
 2'b01:  leadingZeros5 <= 8'd1;
 2'b00:  leadingZeros5 <= 8'd2;
@@ -269,8 +269,8 @@ reg [7:0] lshiftAmt6;
 reg [7:0] rshiftAmt6;
 reg rightOrLeft6;	// 0=left,1=right
 reg xInf6;
-reg [fp16Pkg::EMSB:0] xo6;
-reg [fp16Pkg::FMSB+5:0] mo6;
+reg [fp128Pkg::EMSB:0] xo6;
+reg [fp128Pkg::FMSB+5:0] mo6;
 reg zeroMan6;
 always_comb
 	rightOrLeft6 <= under3;
@@ -296,9 +296,9 @@ always_comb
 // - figure sticky bit
 // ----------------------------------------------------------------------------
 
-reg [fp16Pkg::EMSB:0] xo7;
+reg [fp128Pkg::EMSB:0] xo7;
 reg rightOrLeft7;
-reg [fp16Pkg::FMSB+5:0] mo7l, mo7r;
+reg [fp128Pkg::FMSB+5:0] mo7l, mo7r;
 reg St6,St7;
 always_comb
 	rightOrLeft7 <= rightOrLeft6;
@@ -329,8 +329,8 @@ always_comb
 // ----------------------------------------------------------------------------
 
 reg so;
-reg [fp16Pkg::EMSB:0] xo;
-reg [fp16Pkg::FMSB+5:0] mo;
+reg [fp128Pkg::EMSB:0] xo;
+reg [fp128Pkg::FMSB+5:0] mo;
 
 always_ff @(posedge clk)
 	if (ce) so <= so3;
@@ -345,7 +345,7 @@ always_ff @(posedge clk)
 
 assign o.sign = so;
 assign o.exp = xo;
-assign o.sig = mo[fp16Pkg::FMSB+5:2];
+assign o.sig = mo[FMSB+5:2];
 
 endmodule
 	
