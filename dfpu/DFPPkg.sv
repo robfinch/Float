@@ -1,6 +1,6 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2020-2021  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2020-2022  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
@@ -60,8 +60,32 @@ typedef struct packed
 	logic [109:0] sigc;	// significand continuation field
 } DFP128;
 
+// Packed 128 bit (storage) format
+typedef struct packed
+{
+	logic sign;
+	logic [4:0] combo;
+	logic [9:0] expc;	// exponent continuation field
+	logic [79:0] sigc;	// significand continuation field
+} DFP96;
+
+typedef logic [11:0] DFP96EXP;
+typedef logic [99:0] DFP96SIG;
+
 typedef logic [13:0] DFP128EXP;
 typedef logic [135:0] DFP128SIG;
+
+// Unpacked 96 bit format
+typedef struct packed
+{
+	logic nan;
+	logic qnan;
+	logic snan;
+	logic infinity;
+	logic sign;
+	logic [11:0] exp;
+	logic [99:0] sig;	// significand 25 digits
+} DFP96U;
 
 // Unpacked 128 bit format
 typedef struct packed
@@ -83,9 +107,33 @@ typedef struct packed
 	logic snan;
 	logic infinity;
 	logic sign;
+	logic [11:0] exp;
+	logic [103:0] sig;	// significand 26 digits
+} DFP96UN;
+
+// Normalizer output to rounding, one extra digit
+typedef struct packed
+{
+	logic nan;
+	logic qnan;
+	logic snan;
+	logic infinity;
+	logic sign;
 	logic [13:0] exp;
 	logic [139:0] sig;	// significand 35 digits
 } DFP128UN;
+
+// 96-bit Double width significand, normalizer input
+typedef struct packed
+{
+	logic nan;
+	logic qnan;
+	logic snan;
+	logic infinity;
+	logic sign;
+	logic [11:0] exp;
+	logic [207:0] sig;	// significand 50+ 1 lead, 1-trail digit
+} DFP96UD;
 
 // 128-bit Double width significand, normalizer input
 typedef struct packed

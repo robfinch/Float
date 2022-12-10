@@ -1,11 +1,12 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2020-2021  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2022  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	DPDPack.sv
+//	df128Toi.sv
+//  - convert decimal floating point to integer
 //
 // BSD 3-Clause License
 // Redistribution and use in source and binary forms, with or without
@@ -37,94 +38,73 @@
 
 import DFPPkg::*;
 
-module DFPPack128(i, o);
-input DFP128U i;
-output DFP128 o;
+module df96Toi (rst, clk, ce, ld, op, i, o, overflow, done);
+input rst;
+input clk;
+input ce;
+input ld;
+input op;						// 1 = signed, 0 = unsigned
+input [95:0] i;		// float input
+output [95:0] o;		// integer output
+output overflow;
+output done;
 
-wire [109:0] enc_sig;
-DPDEncodeN #(.N(11)) u1 (i.sig[131:0], enc_sig);
+wire done1;
+reg done2;
+assign done = done1 & done2;
 
-always_comb
-begin
-	// sign
-	o.sign <= i.sign;
-	// combo
-	if (i.qnan|i.snan)
-		o.combo <= 5'b11111;
-	else if (i.infinity)
-		o.combo <= 5'b11110;
-	else
-		o.combo <= i.sig[135:132] > 4'h7 ? {2'b11,i.exp[13:12],i.sig[132]} : {i.exp[13:12],i.sig[134:132]};
-	// exponent continuation
-	if (i.qnan)
-		o.expc <= {1'b0,i.exp[10:0]};
-	else if (i.snan)
-		o.expc <= {1'b1,i.exp[10:0]};
-	else
-		o.expc <= i.exp[11:0];
-	// significand continuation
-	o.sigc <= enc_sig;
-end
+wire [95:0] sig;
 
-endmodule
+DFP96U ui;
+DFPUnpack96 uunpk1 (i, ui);
 
-module DFPPack96(i, o);
-input DFP96U i;
-output DFP96 o;
+wire [95:0] maxInt = op ? {1'd0,{95{1'b1}}} : {96{1'b1}};		// maximum integer value
+wire [11:0] zeroXp = 12'h5FF;
 
-wire [79:0] enc_sig;
-DPDEncodeN #(.N(8)) u1 (i.sig[95:0], enc_sig);
+reg sgn;									// sign
+always_ff @(posedge clk)
+	if (ce) sgn = ui.sign;
+wire [11:0] exp = ui.exp;		// exponent
 
-always_comb
-begin
-	// sign
-	o.sign <= i.sign;
-	// combo
-	if (i.qnan|i.snan)
-		o.combo <= 5'b11111;
-	else if (i.infinity)
-		o.combo <= 5'b11110;
-	else
-		o.combo <= i.sig[99:96] > 4'h7 ? {2'b11,i.exp[11:10],i.sig[96]} : {i.exp[11:10],i.sig[98:96]};
-	// exponent continuation
-	if (i.qnan)
-		o.expc <= {1'b0,i.exp[8:0]};
-	else if (i.snan)
-		o.expc <= {1'b1,i.exp[8:0]};
-	else
-		o.expc <= i.exp[9:0];
-	// significand continuation
-	o.sigc <= enc_sig;
-end
+wire iz = i[94:0]==0;			// zero value (special)
 
-endmodule
-module DFPPack64(i, o);
-input DFP64U i;
-output DFP64 o;
+wire [12:0] ovx = exp - zeroXp;
+assign overflow  = ovx > 23 && !ovx[12];	// lots of numbers are too big - don't forget one less bit is available due to signed values
+wire underflow = exp < zeroXp - 2'd1;			// value less than 1/2
 
-wire [49:0] enc_sig;
-DPDEncodeN #(.N(5)) u1 (i.sig[59:0], enc_sig);
+wire [7:0] shamt = 8'd128 - {(exp - zeroXp),2'd0};	// exp - zeroXp will be <= MSB
 
-always_comb
-begin
-	// sign
-	o.sign <= i.sign;
-	// combo
-	if (i.qnan|i.snan)
-		o.combo <= 5'b11111;
-	else if (i.infinity)
-		o.combo <= 5'b11110;
-	else
-		o.combo <= i.sig[63:60] > 4'h7 ? {2'b11,i.exp[9:8],i.sig[60]} : {i.exp[9:8],i.sig[62:60]};
-	// exponent continuation
-	if (i.qnan)
-		o.expc <= {1'b0,i.exp[6:0]};
-	else if (i.snan)
-		o.expc <= {1'b1,i.exp[6:0]};
-	else
-		o.expc <= i.exp[7:0];
-	// significand continuation
-	o.sigc <= enc_sig;
-end
+wire [128:0] o1 = {ui.sig,33'b0} >> shamt;	// keep an extra bit for rounding
+wire [95:0] o2;		// round up
+reg [95:0] o3;
+
+DDBCDToBin #(.WID(96)) ub2b1
+(
+	.rst(rst),
+	.clk(clk),
+	.ld(ld),
+	.bcd({o1[128:1]+o1[0]}),
+	.bin(o2),
+	.done(done1)
+);
+
+
+always @(posedge clk)
+	if (ce) begin
+		if (underflow|iz)
+			o3 <='d0;
+		else if (overflow)
+			o3 <= maxInt;
+		// value between 1/2 and 1 - round up
+		else if (exp==zeroXp-1)
+			o3 <= 96'd1;
+		// value > 1
+		else
+			o3 <= o2;
+	end
+always @(posedge clk)
+	if (ce) done2 <= done1;
+		
+assign o = (op & sgn) ? -o3 : o3;					// adjust output for correct signed value
 
 endmodule

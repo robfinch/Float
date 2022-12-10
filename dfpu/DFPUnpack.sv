@@ -1,6 +1,6 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2020-2021  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2020-2022  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
@@ -49,6 +49,21 @@ assign o.snan = i.combo==5'b11111 && i.expc[11]==1'b1;
 assign o.infinity = i.combo==5'b11110;
 DPDDecodeN #(.N(11)) u1 (i.sigc, o.sig[131:0]);
 assign o.sig[135:132] = i.combo[4:3]==2'b11 ? {3'b100,i.combo[0]} : {1'b0,i.combo[2:0]};
+endmodule
+
+module DFPUnpack96(i, o);
+input DFP96 i;
+output DFP96U o;
+
+assign o.sign = i.sign;
+assign o.exp = {i.combo[4:3]==2'b11 ? i.combo[2:1] : i.combo[4:3],i.expc};
+assign o.nan = i.combo==5'b11111;
+assign o.qnan = i.combo==5'b11111 && i.expc[9]==1'b0;
+assign o.snan = i.combo==5'b11111 && i.expc[9]==1'b1;
+assign o.infinity = i.combo==5'b11110;
+DPDDecodeN #(.N(8)) u1 (i.sigc, o.sig[95:0]);
+assign o.sig[99:96] = i.combo[4:3]==2'b11 ? {3'b100,i.combo[0]} : {1'b0,i.combo[2:0]};
+
 endmodule
 
 module DFPUnpack64(i, o);

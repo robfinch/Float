@@ -1,11 +1,11 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2020-2021  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2020-2022  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	DPDPack.sv
+//	DFPCompare96.sv
 //
 // BSD 3-Clause License
 // Redistribution and use in source and binary forms, with or without
@@ -37,94 +37,53 @@
 
 import DFPPkg::*;
 
-module DFPPack128(i, o);
-input DFP128U i;
-output DFP128 o;
+module DFPCompare96(a, b, o);
+input DFP96 a;
+input DFP96 b;
+output reg [11:0] o ='d0;
+localparam N=34;			// number of BCD digits
 
-wire [109:0] enc_sig;
-DPDEncodeN #(.N(11)) u1 (i.sig[131:0], enc_sig);
+parameter TRUE = 1'b1;
+parameter FALSE = 1'b0;
+
+DFP96U au;
+DFP96U bu;
+
+DFPUnpack96 u00 (a, au);
+DFPUnpack96 u01 (b, bu);
+
+reg sa, sb;
+always_comb
+	sa = au.sign;
+always_comb
+	sb = bu.sign;
+wire az = ~|{au.exp,au.sig};
+wire bz = ~|{bu.exp,bu.sig};
+wire unordered = au.nan | bu.nan;
+
+wire eq = !unordered & ((az & bz) || (a==b));	// special test for zero
+wire gt1 = {au.exp,au.sig} > {bu.exp,bu.sig};
+wire lt1 = {au.exp,au.sig} < {bu.exp,bu.sig};
+
+wire lt = sa ^ sb ? sa & !(az & bz): sa ? gt1 : lt1;
 
 always_comb
 begin
-	// sign
-	o.sign <= i.sign;
-	// combo
-	if (i.qnan|i.snan)
-		o.combo <= 5'b11111;
-	else if (i.infinity)
-		o.combo <= 5'b11110;
-	else
-		o.combo <= i.sig[135:132] > 4'h7 ? {2'b11,i.exp[13:12],i.sig[132]} : {i.exp[13:12],i.sig[134:132]};
-	// exponent continuation
-	if (i.qnan)
-		o.expc <= {1'b0,i.exp[10:0]};
-	else if (i.snan)
-		o.expc <= {1'b1,i.exp[10:0]};
-	else
-		o.expc <= i.exp[11:0];
-	// significand continuation
-	o.sigc <= enc_sig;
+	o[0] = eq;
+	o[1] = lt;
+	o[2] = lt|eq;
+	o[3] = lt1;
+	o[4] = unordered;
+	o[5] = ~eq;
+	o[6] = ~lt;
+	o[7] = ~(lt|eq);
+	o[8] = ~lt1;
+	o[9] = ~unordered;
+	o[10] = 1'b0;
+	o[11] = lt;
 end
 
-endmodule
-
-module DFPPack96(i, o);
-input DFP96U i;
-output DFP96 o;
-
-wire [79:0] enc_sig;
-DPDEncodeN #(.N(8)) u1 (i.sig[95:0], enc_sig);
-
-always_comb
-begin
-	// sign
-	o.sign <= i.sign;
-	// combo
-	if (i.qnan|i.snan)
-		o.combo <= 5'b11111;
-	else if (i.infinity)
-		o.combo <= 5'b11110;
-	else
-		o.combo <= i.sig[99:96] > 4'h7 ? {2'b11,i.exp[11:10],i.sig[96]} : {i.exp[11:10],i.sig[98:96]};
-	// exponent continuation
-	if (i.qnan)
-		o.expc <= {1'b0,i.exp[8:0]};
-	else if (i.snan)
-		o.expc <= {1'b1,i.exp[8:0]};
-	else
-		o.expc <= i.exp[9:0];
-	// significand continuation
-	o.sigc <= enc_sig;
-end
-
-endmodule
-module DFPPack64(i, o);
-input DFP64U i;
-output DFP64 o;
-
-wire [49:0] enc_sig;
-DPDEncodeN #(.N(5)) u1 (i.sig[59:0], enc_sig);
-
-always_comb
-begin
-	// sign
-	o.sign <= i.sign;
-	// combo
-	if (i.qnan|i.snan)
-		o.combo <= 5'b11111;
-	else if (i.infinity)
-		o.combo <= 5'b11110;
-	else
-		o.combo <= i.sig[63:60] > 4'h7 ? {2'b11,i.exp[9:8],i.sig[60]} : {i.exp[9:8],i.sig[62:60]};
-	// exponent continuation
-	if (i.qnan)
-		o.expc <= {1'b0,i.exp[6:0]};
-	else if (i.snan)
-		o.expc <= {1'b1,i.exp[6:0]};
-	else
-		o.expc <= i.exp[7:0];
-	// significand continuation
-	o.sigc <= enc_sig;
-end
+// an unorder comparison will signal a nan exception
+//assign nanx = op!=`FCOR && op!=`FCUN && unordered;
 
 endmodule
