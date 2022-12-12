@@ -5,7 +5,7 @@
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	iTodf128_tb.sv
+//	iTodf96_tb.sv
 //  - test convert integer to decimal floating point
 //
 // BSD 3-Clause License
@@ -36,15 +36,15 @@
 //                                                                          
 // ============================================================================
 
-module i2df128_tb();
+module i2df96_tb();
 
 reg rst;
 reg clk;
 reg [15:0] adr;
-wire [127:0] flt;
+wire [95:0] flt;
 reg [7:0] count;
 
-reg [127:0] bin;
+reg [95:0] bin;
 
 integer outfile;
 
@@ -64,7 +64,7 @@ always #5
 
 genvar g;
 generate begin : gRand
-	for (g = 0; g < 128; g = g + 4) begin
+	for (g = 0; g < 96; g = g + 4) begin
 		always @(posedge clk) begin
 			if (count==2)
 				bin[g+3:g] <= $urandom() % 16;
@@ -88,22 +88,22 @@ begin
 	if (count > 140)
 		count <= 1'd1;
 	if (adr==1) begin
-		bin <= 128'h01;
+		bin <= 96'h01;
 	end
 	if (adr==2) begin
-		bin <= 128'h0A;
+		bin <= 96'h0A;
 	end
 	if (adr==3) begin
-		bin <= 128'd100;
+		bin <= 96'd100;
 	end
 	if (adr==4) begin
-		bin <= 128'd1000;
+		bin <= 96'd1000;
 	end
 	if (adr==5) begin
-		bin <= 128'd1000000;
+		bin <= 96'd1000000;
 	end
 	if (adr==6) begin
-		bin <= 128'd12345678;
+		bin <= 96'd12345678;
 	end
 	if (count==140) begin
   	$fwrite(outfile, "%c %h\t%h\n", adr[11] ? "s" : "u", bin, flt);
@@ -111,7 +111,7 @@ begin
 	end
 end
 
-i2df128 u6 (
+i2df96 u6 (
 	.rst(rst),
   .clk(clk),
   .ce(1'b1),

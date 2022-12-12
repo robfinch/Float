@@ -73,7 +73,7 @@ output reg co;
 reg [N-1:0] c [0:2];
 wire [N*8-1:0] o1 [0:2];
 reg [N*8-1:0] o2 [0:2];
-wire [N:0] d [0:2];
+wire [N-1:0] d [0:2];
 
 genvar g,k;
 generate begin : gBCDadd

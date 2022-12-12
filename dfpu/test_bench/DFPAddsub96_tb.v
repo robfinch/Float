@@ -1,12 +1,13 @@
+`timescale 1ns / 1ps
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2022  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2006-2022  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	iTodf128_tb.sv
-//  - test convert integer to decimal floating point
+//	DFPAddsub96_tb.v
+//		- decimal floating point addsub test bench
 //
 // BSD 3-Clause License
 // Redistribution and use in source and binary forms, with or without
@@ -36,15 +37,20 @@
 //                                                                          
 // ============================================================================
 
-module i2df128_tb();
-
+module DFPAddsub96_tb();
 reg rst;
 reg clk;
 reg [15:0] adr;
-wire [127:0] flt;
-reg [7:0] count;
+reg [95:0] a,b;
+wire [95:0] o;
+reg [95:0] ad,bd;
+reg [95:0] od;
+reg [3:0] rm;
 
-reg [127:0] bin;
+integer n;
+reg [95:0] a1, b1;
+wire [63:0] doubleA = {a[31], a[30], {3{~a[30]}}, a[29:23], a[22:0], {29{1'b0}}};
+wire [63:0] doubleB = {b[31], b[30], {3{~b[30]}}, b[29:23], b[22:0], {29{1'b0}}};
 
 integer outfile;
 
@@ -52,7 +58,8 @@ initial begin
 	rst = 1'b0;
 	clk = 1'b0;
 	adr = 0;
-	bin = $urandom(1);
+	a = $urandom(1);
+	b = 1;
 	#20 rst = 1;
 	#50 rst = 0;
 	#10000000  $fclose(outfile);
@@ -64,15 +71,16 @@ always #5
 
 genvar g;
 generate begin : gRand
-	for (g = 0; g < 128; g = g + 4) begin
+	for (g = 0; g < 96; g = g + 4) begin
 		always @(posedge clk) begin
-			if (count==2)
-				bin[g+3:g] <= $urandom() % 16;
+			a1[g+3:g] <= $urandom() % 10;
+			b1[g+3:g] <= $urandom() % 10;
 		end
 	end
 end
 endgenerate
 
+reg [15:0] count;
 always @(posedge clk)
 if (rst) begin
 	adr <= 0;
@@ -81,46 +89,74 @@ end
 else
 begin
   if (adr==0) begin
-    outfile = $fopen("f:/cores2022/float/dfpu/test_bench/i2df128_tvo.txt", "wb");
-    $fwrite(outfile, "s ------ bin ------  ------ flt ------  \n");
+    outfile = $fopen("f:/cores2022/Float/dfpu/test_bench/DFPAddsub96_tvo.txt", "wb");
+    $fwrite(outfile, " rm ------- A ------  ------- B ------  ------ sum -----  -- SIM Sum --\n");
   end
 	count <= count + 1;
-	if (count > 140)
+	if (count > 50)
 		count <= 1'd1;
-	if (adr==1) begin
-		bin <= 128'h01;
+	if (count==2) begin
+		a <= a1;
+		b <= b1;
+		a[95:92] <= 4'h5;
+		b[95:92] <= 4'h5;
+		rm <= adr[14:12];
+		//ad <= memd[adr][63: 0];
+		//bd <= memd[adr][127:64];
 	end
-	if (adr==2) begin
-		bin <= 128'h0A;
+	
+//-0	543771554911558566002677	581816070341546924523033	543771554911558566002677
+
+	if (adr==3 && count==2) begin
+		a <= 96'h543771554911558566002677;
+		b <= 96'h543716070341546924523033;
+		//a <= 96'h25ff00000000000000000000;	// 1
+		//b <= 96'h25ff00000000000000000000;	// 1
 	end
-	if (adr==3) begin
-		bin <= 128'd100;
+	if (adr==2 && count==2) begin
+		a <= 96'h260000000000000000000000;	// 10
+		b <= 96'h25ff00000000000000000000;	// 1
 	end
-	if (adr==4) begin
-		bin <= 128'd1000;
+	if (adr==1 && count==2) begin
+		a <= 96'h260100000000000000000000;	// 100
+		b <= 96'h25ff00000000000000000000;	// 1
 	end
-	if (adr==5) begin
-		bin <= 128'd1000000;
+	if (adr==4 && count==2) begin
+		a <= 96'h260200000000000000000000;	// 1000
+		b <= 96'h25ff00000000000000000000;	// 1
 	end
-	if (adr==6) begin
-		bin <= 128'd12345678;
+	if (adr==5 && count==2) begin
+		a <= 96'h26064D2E7030000000000000;	// 12345678
+		b <= 96'h260000000000000000000000;	// 10
 	end
-	if (count==140) begin
-  	$fwrite(outfile, "%c %h\t%h\n", adr[11] ? "s" : "u", bin, flt);
+	if (adr==6 && count==2) begin
+		a <= 96'h440000000000000000000000;
+		b <= 96'h440000000000000000000000;
+	end
+	if (adr==7 && count==2) begin
+		a <= 96'h440040000000000000000000;
+		b <= 96'h440040000000000000000000;
+	end
+	if (count==50) begin
+		if (~adr[11]) begin
+	  	$fwrite(outfile, "%c%h\t%h\t%h\t%h\n", "-",rm, a, b, o);
+	  end
+	  else begin
+	  	$fwrite(outfile, "%c%h\t%h\t%h\t%h\n", "+",rm, a, b, o);
+	  end
 		adr <= adr + 1;
 	end
 end
 
-i2df128 u6 (
-	.rst(rst),
+//fpMulnr #(64) u1 (clk, 1'b1, a, b, o, rm);//, sign_exe, inf, overflow, underflow);
+DFPAddsub96nr u6 (
   .clk(clk),
   .ce(1'b1),
-  .op(adr[11]),
-  .rm(3'd0),
-  .ld(count==3),
-  .i(bin),
-  .o(flt),
-  .done()
-);
+  .op(~adr[11]),
+  .a(a),
+  .b(b),
+  .o(o),
+  .rm(rm)
+  );
 
 endmodule

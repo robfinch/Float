@@ -40,14 +40,9 @@
 // ============================================================================
 
 import DFPPkg::*;
-import fp::*;
 
 module DFPSqrt96(rst, clk, ce, ld, a, o, done, sqrinf, sqrneg);
 parameter N=25;
-localparam pShiftAmt =
-	FPWID==80 ? 48 :
-	FPWID==64 ? 36 :
-	FPWID==32 ? 7 : (FMSB+1-16);
 input rst;
 input clk;
 input ce;
@@ -63,6 +58,7 @@ reg sign_exe;
 reg inf;
 reg	overflow;
 reg	underflow;
+wire sign = 1'b0;
 
 wire so;
 wire [13:0] xo;

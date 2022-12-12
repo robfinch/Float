@@ -76,6 +76,15 @@ BCDAdd8NClk #(.N((N+2)/2)) ubcdadn1
 wire [(N+1)*4-1:0] odd10;
 wire odd10c;
 
+BCDSubtract #(N+2) ubcdsubn1
+(
+	.clk(clk),
+	.a({8'h00,oaa10}),
+	.b({8'h00,obb10}),
+	.o(odd10),
+	.co(odd10c)
+);
+/*
 BCDSub8NClk #(.N((N+2)/2)) ubcdsdn1
 (
 	.clk(clk),
@@ -85,7 +94,7 @@ BCDSub8NClk #(.N((N+2)/2)) ubcdsdn1
 	.ci(1'b0),
 	.co(odd10c)
 );
-
+*/
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 // Clock #1
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
@@ -121,7 +130,6 @@ reg xa_gt_xb2;
 reg [N*4-1:0] siga2, sigb2;
 reg sigeq, siga_gt_sigb;
 reg expeq;
-reg sxo2;
 
 always_ff @(posedge clk)
   if (ce) realOp2 = op1 ^ au.sign ^ bu.sign;
@@ -159,7 +167,6 @@ always_ff @(posedge clk)
 //
 reg [11:0] xa3, xb3;
 reg resZero3;
-wire xaInf3, xbInf3;
 reg xa_gt_xb3;
 reg a_gt_b3;
 reg op3;
@@ -186,8 +193,8 @@ always_ff @(posedge clk)
 ft_delay #(.WID(1), .DEP(2)) udly3c (.clk(clk), .ce(ce), .i(au.sign), .o(sa3));
 ft_delay #(.WID(1), .DEP(2)) udly3d (.clk(clk), .ce(ce), .i(bu.sign), .o(sb3));
 ft_delay #(.WID(3), .DEP(3)) udly3e (.clk(clk), .ce(ce), .i(rm), .o(rm3));
-ft_delay #(.WID(1), .DEP(2)) udly3f (.clk(clk), .ce(ce), .i(aInf), .o(aInf3));
-ft_delay #(.WID(1), .DEP(2)) udly3g (.clk(clk), .ce(ce), .i(bInf), .o(bInf3));
+ft_delay #(.WID(1), .DEP(3)) udly3f (.clk(clk), .ce(ce), .i(au.infinity), .o(aInf3));
+ft_delay #(.WID(1), .DEP(3)) udly3g (.clk(clk), .ce(ce), .i(bu.infinity), .o(bInf3));
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 // Clock #4
@@ -355,9 +362,7 @@ reg [(N+1)*4*2-1:0] mo12;	// mantissa output
 reg nan12;
 reg qnan12;
 reg infinity12;
-wire sxo11;
 wire so11;
-ft_delay #(.WID(1), .DEP(9)) udly12a (.clk(clk), .ce(ce), .i(sxo2), .o(sxo11));
 ft_delay #(.WID(1), .DEP(7)) udly12b (.clk(clk), .ce(ce), .i(so4), .o(so11));
 
 always_ff @(posedge clk)
@@ -388,9 +393,6 @@ end
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 // Clock #13
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-wire so;			// sign output
-wire [13:0] xo;	// de normalized exponent output
-wire [(N+1)*4*2-1:0] mo;	// mantissa output
 
 ft_delay #(.WID(1), .DEP(1)) u13c (.clk(clk), .ce(ce), .i(nan12), .o(o.nan) );
 ft_delay #(.WID(1), .DEP(1)) u13d (.clk(clk), .ce(ce), .i(qnan12), .o(o.qnan) );

@@ -275,14 +275,14 @@ reg [(N+2)*4-1:0] mo7l, mo7r;
 reg St6,St7;
 ft_delay #(.WID(1),.DEP(1)) u71 (.clk(clk), .ce(ce), .i(rightOrLeft6), .o(rightOrLeft7));
 
-wire [11:0] xo7d = xo6 - lshiftAmt6;
-
 always_ff @(posedge clk)
 if (ce)
-	xo7 <= zeroMan6 ? xo6 :
-		xInf6 ? xo6 :					// an infinite exponent is either a NaN or infinity; no need to change
-		rightOrLeft6 ? 1'd0 :	// on a right shift, the exponent was negative, it's being made to zero
-		xo7d;			// on a left shift, the exponent can't be decremented below zero
+	casez({zeroMan6,xInf6,rightOrLeft6})
+	3'b1??:	xo7 <= xo6;
+	3'b01?: xo7 <= xo6;		// an infinite exponent is either a NaN or infinity; no need to change
+	3'b001: xo7 <= 'd0;		// on a right shift, the exponent was negative, it's being made to zero
+	default:	xo7 <= xo6 - lshiftAmt6[7:2];	// lshiftAmt6 is a multiple of four (whole digit)
+	endcase
 
 always_ff @(posedge clk)
 	if (ce) mo7r <= mo6 >> rshiftAmt6;

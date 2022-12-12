@@ -90,7 +90,7 @@ cntlz128Reg   u4 (.clk(clk), .ce(ce), .i(bcd), .o(lz) );
 always_comb
 	lz4 = lz >> 2'd2;
 
-assign wd = zeroXp - 8'd1 + 8'd25 - lz4 + 8'd9;	// constant except for lz
+assign wd = zeroXp - 8'd1 + 8'd25 - lz4 + 8'd7;	// constant except for lz
 
 reg [11:0] xo;
 
@@ -104,19 +104,19 @@ always_ff @(posedge clk)
 // Rounding is required only when the number needs to be right-shifted.
 
 always_ff @(posedge clk)
-	if (lz4 < 8'd9)	
-		simag = bcd1 >> {8'd9 - lz4,2'd0};
+	if (lz4 < 8'd7)	
+		simag = bcd1 >> {8'd7 - lz4,2'd0};
 	else
-		simag = bcd1 << {lz4 - 8'd9,2'd0};	
+		simag = bcd1 << {lz4 - 8'd7,2'd0};	
 
-wire g =  bcd1[{8'd9 - lz4,2'd0}];	// guard bit (lsb)
-wire r = 	bcd1[{8'd9 - lz4,2'd0}-1];	// rounding bit
-wire s = |(bcd1 & (128'd1 << {8'd9 - lz4,2'd0}-2) - 2'd1);	// "sticky" bit
+wire g =  bcd1[{8'd7 - lz4,2'd0}];	// guard bit (lsb)
+wire r = 	bcd1[{8'd7 - lz4,2'd0}-1];	// rounding bit
+wire s = |(bcd1 & (128'd1 << {8'd7 - lz4,2'd0}-2) - 2'd1);	// "sticky" bit
 reg rnd;
 
 // Compute the round bit
 always_ff @(posedge clk)
-if (lz4 < 8'd9)
+if (lz4 < 8'd7)
 	case (rmd)
 	3'd0:	rnd = (g & r) | (r & s);	// round to nearest even
 	3'd1:	rnd = 0;					// round to zero (truncate)

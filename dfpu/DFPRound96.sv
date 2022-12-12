@@ -153,7 +153,7 @@ delay3 #(1) u22 (.clk(clk), .ce(ce), .i(i.qnan), .o(qnano));
 delay3 #(1) u23 (.clk(clk), .ce(ce), .i(i.snan), .o(snano));
 delay2 #(1) u24 (.clk(clk), .ce(ce), .i(i.infinity), .o(infinity2));
 delay3 #(1) u25 (.clk(clk), .ce(ce), .i(i.sign), .o(so));
-delay1 #(12) u26 (.clk(clk), .ce(ce), .i(xo2[13:0]), .o(xo));
+delay1 #(12) u26 (.clk(clk), .ce(ce), .i(xo2[11:0]), .o(xo));
 delay1 #(1) u27 (.clk(clk), .ce(ce), .i(infinity2 | (rnd2 && xo2[11:0]==12'hBFF)), .o(infinity));
 `endif
 
