@@ -72,7 +72,7 @@ DFPUnpack96 u01 (a, au);
 always @(posedge clk)
 	if (ce) xa1a <= au.exp;
 always @(posedge clk)
-	if (ce) xa1b <= au.exp + b;
+	if (ce) xa1b <= bs ? au.exp - (~b[11:0] + 2'd1) : au.exp + b;
 always @(posedge clk)
 	if (ce) bs1 <= bs;
 always @(posedge clk)
@@ -100,6 +100,7 @@ always @(posedge clk)
 	if (ce) snan2 <= anan1 && ma1[N*4-1:N*4-4]==4'h0;
 always @(posedge clk)
 if (ce) begin
+	infinity2 <= 1'b0;
 	if (anan1) begin
 		xa2 <= xa1a;
 		ma2 <= ma1;

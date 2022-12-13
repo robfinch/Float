@@ -1,11 +1,13 @@
+`timescale 1ns / 1ps
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2020-2022  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2022  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	DFPCompare96.sv
+//	DDBinToBCD.sv
+//  Uses the Dubble Dabble algorithm
 //
 // BSD 3-Clause License
 // Redistribution and use in source and binary forms, with or without
@@ -34,56 +36,98 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //                                                                          
 // ============================================================================
+//
+module DDBinToBCDFract(rst, clk, ld, bin, bcd, done);
+parameter WID = 128;
+parameter DEP = 2;		// cascade depth
+localparam BCDWID = ((WID+(WID-4)/3)+3) & -4;
+input rst;
+input clk;
+input ld;
+input [WID-1:0] bin;
+output reg [BCDWID-1:0] bcd;
+output reg done;
 
-import DFPPkg::*;
+integer k;
+genvar n,g;
+reg [WID-1:0] binw;								// working binary value
+reg [WID+3:0] bin10;							// working binary value
+reg [BCDWID-1:0] bcdwt;
+reg [BCDWID-1:0] bcdw [0:DEP-1];	// working bcd value
+reg [7:0] bitcnt;
+reg [2:0] state;
+parameter IDLE = 3'd0;
+parameter CHK5 = 3'd1;
+parameter SHFT = 3'd2;
+parameter DONE = 3'd3;
 
-module DFPCompare96(a, b, o);
-input DFP96 a;
-input DFP96 b;
-output reg [11:0] o ='d0;
-localparam N=25;			// number of BCD digits
-
-parameter TRUE = 1'b1;
-parameter FALSE = 1'b0;
-
-DFP96U au;
-DFP96U bu;
-
-DFPUnpack96 u00 (a, au);
-DFPUnpack96 u01 (b, bu);
-
-reg sa, sb;
-always_comb
-	sa = au.sign;
-always_comb
-	sb = bu.sign;
-wire az = ~|{au.exp,au.sig};
-wire bz = ~|{bu.exp,bu.sig};
-wire unordered = au.nan | bu.nan;
-
-wire eq = !unordered & ((az & bz) || (a==b));	// special test for zero
-wire gt1 = {au.exp,au.sig} > {bu.exp,bu.sig};
-wire lt1 = {au.exp,au.sig} < {bu.exp,bu.sig};
-
-wire lt = sa ^ sb ? sa & !(az & bz): sa ? gt1 : lt1;
-
-always_comb
+function [BCDWID-1:0] fnRow;
+input [BCDWID-1:0] i;
+input lsb;
 begin
-	o[0] = eq;
-	o[1] = lt;
-	o[2] = lt|eq;
-	o[3] = lt1;
-	o[4] = unordered;
-	o[5] = ~eq;
-	o[6] = ~lt;
-	o[7] = ~(lt|eq);
-	o[8] = ~lt1;
-	o[9] = ~unordered;
-	o[10] = 1'b0;
-	o[11] = lt;
+	fnRow = 'd0;
+	for (k = 0; k < BCDWID; k = k + 4)
+		if (((i >> k) & 4'hF) > 4'd4)
+			fnRow = fnRow | (((i >> k) & 4'hF) + 4'd3) << k;
+		else
+			fnRow = fnRow | ((i >> k) & 4'hf) << k;
+	fnRow = {fnRow,lsb};
+end
+endfunction
+
+always_comb
+	bcdw[0] = fnRow(bcdwt,binw[WID-1]);
+generate begin : gRows
+	for (n = 1; n < DEP; n = n + 1)
+		always_comb
+			bcdw[n] = fnRow(bcdw[n-1],binw[WID-1-n]);
+end
+endgenerate
+
+always_ff @(posedge clk)
+	if (WID % DEP) begin
+		$display("Width must be a multiple of DEP, DEP must be at least 2.");
+		$finish;
+	end
+
+always_ff @(posedge clk)
+if (rst) begin
+	state <= IDLE;
+	done <= 1'b1;
+	bcdwt <= 'd0;
+	binw <= 'd0;
+	bitcnt <= BCDWID/4;
+end
+else begin
+	if (ld) begin
+		done <= 1'b0;
+		bin10 <= bin;
+		bcdwt <= 'd0;
+		state <= SHFT;
+		bcd <= 'd0;
+	end
+	else
+	case(state)
+	IDLE:	;
+	SHFT:
+		begin
+			bitcnt <= bitcnt - 2'd1;
+			if (bitcnt==8'd1) begin
+				state <= DONE;
+			end
+			bin10 <= {bin10[WID-1:0],3'b0} + {bin10[WID-1:0],1'b0};
+			bcdwt <= {bcdwt,bin10[WID+3:WID]};
+		end
+	DONE:
+		begin
+			bcd <= bcdwt;
+			done <= 1'b1;
+			state <= IDLE;
+		end
+	default:
+		state <= IDLE;
+	endcase
 end
 
-// an unorder comparison will signal a nan exception
-//assign nanx = op!=`FCOR && op!=`FCUN && unordered;
 
 endmodule

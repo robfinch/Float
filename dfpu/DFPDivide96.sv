@@ -134,9 +134,9 @@ ft_delay #(.WID(1), .DEP(1)) udly1 (.clk(clk), .ce(ce), .i(ld), .o(ld1));
 // -----------------------------------------------------------
 wire done3a,done3;
 // Perform divide
-dfdiv #(N+2) u2 (.clk(clk), .ld(ld1), .a({siga,8'b0}), .b({sigb,8'b0}), .q(divo), .r(), .done(done1), .lzcnt(lzcnt));
-wire [7:0] lzcnt_bin = lzcnt[3:0] + (lzcnt[7:4] * 10);
-wire [(N+2)*4*2-1:0] divo1 = divo[(N+2)*4*2-1:0] << ({lzcnt_bin,2'b0}+N*4);//WAS FPWID=128?+44
+dfdiv2 #(N+2) u2 (.clk(clk), .ld(ld1), .a({siga,8'b0}), .b({sigb,8'b0}), .q(divo), .r(), .done(done1), .lzcnt(lzcnt));
+//wire [7:0] lzcnt_bin = lzcnt[3:0] + (lzcnt[7:4] * 10);
+wire [(N+2)*4*2-1:0] divo1 = divo[(N+2)*4*2-1:0] << ({lzcnt-1,2'b0});//WAS FPWID=128?+44
 ft_delay #(.WID(1), .DEP(3)) u3 (.clk(clk), .ce(ce), .i(done1), .o(done3a));
 assign done3 = done1&done3a;
 
@@ -154,7 +154,7 @@ reg [13:0] ex1;	// sum of exponents
 reg qNaNOut;
 
 always @(posedge clk)
-  if (ce) ex1 <= au.exp - bu.exp + bias - lzcnt_bin;
+  if (ce) ex1 <= au.exp - bu.exp + bias - (({lzcnt,2'b00} > N+2) ? lzcnt-(N+2) : 0);
 
 always @(posedge clk)
   if (ce) qNaNOut <= (az&bz)|(aInf&bInf);

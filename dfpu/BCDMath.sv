@@ -100,6 +100,82 @@ BCDAddAdjust u4 (hsN3,o[15:12],c);
 
 endmodule
 
+module BCDAddNClk(clk,ci,a,b,o,co);
+parameter N=25;
+input clk;
+input ci;
+input [N*4-1:0] a;
+input [N*4-1:0] b;
+output reg [N*4-1:0] o;
+output reg co;
+
+reg [N-1:0] cg;
+wire [N*4-1:0] s;
+reg [N*4-1:0] on [0:3];
+reg [3:0] cn;
+
+genvar g;
+generate begin :gAdd
+	for (g = 0; g < N; g = g + 1)
+	BCDAddNyb u1 (
+		.ci(g==0 ? ci : cg[g-1]),
+		.a(a[g*4+3:g*4]),
+		.b(b[g*4+3:g*4]),
+		.o(s[g*4+3:g*4]),
+		.c(cg[g])
+	);
+end
+endgenerate
+
+always_ff @(posedge clk)
+	on[0] <= s;
+always_ff @(posedge clk)
+	on[1] <= on[0];
+always_ff @(posedge clk)
+	on[2] <= on[1];
+always_ff @(posedge clk)
+	o <= on[2];
+always_ff @(posedge clk)
+	cn[0] <= cg[N-1];
+always_ff @(posedge clk)
+	cn[1] <= cn[0];
+always_ff @(posedge clk)
+	cn[2] <= cn[1];
+always_ff @(posedge clk)
+	co <= cn[2];
+
+endmodule
+
+module BCDAddN(ci,a,b,o,co);
+parameter N=25;
+input ci;
+input [N*4-1:0] a;
+input [N*4-1:0] b;
+output [N*4-1:0] o;
+output co;
+
+reg [N-1:0] cg;
+wire [N*4-1:0] s;
+
+genvar g;
+generate begin :gAdd
+	for (g = 0; g < N; g = g + 1)
+	BCDAddNyb u1 (
+		.ci(g==0 ? ci : cg[g-1]),
+		.a(a[g*4+3:g*4]),
+		.b(b[g*4+3:g*4]),
+		.o(s[g*4+3:g*4]),
+		.c(cg[g])
+	);
+end
+endgenerate
+
+assign o = s;
+assign co = cg[N-1];
+
+endmodule
+
+/*
 module BCDAddN(ci,a,b,o,co);
 parameter N=24;
 input ci;		// carry input
@@ -126,75 +202,7 @@ end
 endgenerate
 
 endmodule
-
-module BCDSub(ci,a,b,o,c);
-input ci;		// carry input
-input [7:0] a;
-input [7:0] b;
-output [7:0] o;
-output c;
-
-wire c0,c1;
-
-wire [4:0] hdN0 = a[3:0] - b[3:0] - ci;
-wire [4:0] hdN1 = a[7:4] - b[7:4] - c0;
-
-BCDSubAdjust u1 (hdN0,o[3:0],c0);
-BCDSubAdjust u2 (hdN1,o[7:4],c);
-
-endmodule
-
-module BCDSub4(ci,a,b,o,c,c8);
-input ci;		// carry input
-input [15:0] a;
-input [15:0] b;
-output [15:0] o;
-output c;
-output c8;
-
-wire c0,c1,c2;
-assign c8 = c1;
-
-wire [4:0] hdN0 = a[3:0] - b[3:0] - ci;
-wire [4:0] hdN1 = a[7:4] - b[7:4] - c0;
-wire [4:0] hdN2 = a[11:8] - b[11:8] - c1;
-wire [4:0] hdN3 = a[15:12] - b[15:12] - c2;
-
-BCDSubAdjust u1 (hdN0,o[3:0],c0);
-BCDSubAdjust u2 (hdN1,o[7:4],c1);
-BCDSubAdjust u3 (hdN2,o[11:8],c2);
-BCDSubAdjust u4 (hdN3,o[15:12],c);
-
-endmodule
-
-module BCDSubN(ci,a,b,o,co);
-parameter N=24;
-input ci;		// carry input
-input [N*4-1:0] a;
-input [N*4-1:0] b;
-output [N*4-1:0] o;
-output co;
-
-genvar g;
-generate begin : gBCDSubN
-reg [4:0] hdN [0:N-1];
-wire [N:0] c;
-
-assign c[0] = ci;
-assign co = c[N];
-
-for (g = 0; g < N; g = g + 1)
-	always @*
-		hdN[g] = a[g*4+3:g*4] - b[g*4+3:g*4] - c[g];
-
-for (g = 0; g < N; g = g + 1)
-	BCDSubAdjust u1 (hdN[g],o[g*4+3:g*4],c[g+1]);
-end
-endgenerate
-
-endmodule
-			 
-
+*/
 module BCDAddAdjust(i,o,c);
 input [4:0] i;
 output [3:0] o;

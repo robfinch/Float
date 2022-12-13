@@ -77,8 +77,8 @@ wire [N-1:0] d [0:2];
 
 genvar g,k;
 generate begin : gBCDadd
-for (g = 0; g < N; g = g + 1) begin
-	for (k = 0; k < 3; k = k + 1) begin
+for (k = 0; k < 3; k = k + 1) begin
+	for (g = 0; g < N; g = g + 1) begin
 		initial begin
 			c[k][g] <= 'b0;
 		end

@@ -63,11 +63,11 @@ reg [(N+1)*4-1:0] obb10;
 wire [(N+1)*4-1:0] oss10;
 wire oss10c;
 
-BCDAdd8NClk #(.N((N+2)/2)) ubcdadn1
+BCDAddNClk #(.N(N+1)) ubcdadn1
 (
 	.clk(clk),
-	.a({8'h00,oaa10}),
-	.b({8'h00,obb10}),
+	.a({4'h0,oaa10}),
+	.b({4'h0,obb10}),
 	.o(oss10),
 	.ci(1'b0),
 	.co(oss10c)
@@ -76,13 +76,13 @@ BCDAdd8NClk #(.N((N+2)/2)) ubcdadn1
 wire [(N+1)*4-1:0] odd10;
 wire odd10c;
 
-BCDSubtract #(N+2) ubcdsubn1
+BCDSubtract #(.N(N+1)) ubcdsubn1
 (
 	.clk(clk),
-	.a({8'h00,oaa10}),
-	.b({8'h00,obb10}),
+	.a({4'h00,oaa10}),
+	.b({4'h00,obb10}),
 	.o(odd10),
-	.co(odd10c)
+	.sgn(odd10c)
 );
 /*
 BCDSub8NClk #(.N((N+2)/2)) ubcdsdn1
