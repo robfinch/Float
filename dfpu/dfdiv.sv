@@ -5,8 +5,8 @@
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	dfmul.v
-//    Decimal Float multiplier primitive
+//	dfdiv.v
+//    Decimal Float divider primitive
 //
 // BSD 3-Clause License
 // Redistribution and use in source and binary forms, with or without
@@ -36,7 +36,7 @@
 //                                                                          
 // ============================================================================
 
-module dfmul(clk, ld, a, b, p, done);
+module dfdiv(clk, ld, a, b, q, r, done, lzcnt);
 parameter N=33;
 localparam FPWID = N*4;
 parameter RADIX = 10;
@@ -46,103 +46,155 @@ input clk;
 input ld;
 input [FPWID-1:0] a;
 input [FPWID-1:0] b;
-output reg [FPWID*2-1:0] p;
+output reg [FPWID*2-1:0] q;
+output reg [FPWID-1:0] r;
 output reg done;
+output reg [7:0] lzcnt;	// Leading zero digit count as a BCD number
 
 
 reg [1:0] st;
-parameter PREP = 2'd0;
-parameter ADDN = 2'd1;
+parameter IDLE = 2'd0;
+parameter SUBN = 2'd1;
 parameter DONE = 2'd2;
 
+reg [3:0] cnt;				// iteration count
+wire [3:0] cntm1 = cnt;//cnt==4'd0 ? 4'd9 : cnt-1'd1;
 reg [7:0] dcnt;				// digit count
-reg [9:0] clkcnt;
-reg [FPWID*2-1:0] pi = 0;
-reg [FPWID-1:0] ai = 0;
-reg [FPWID*2-1:0] bi = 0;
-wire [FPWID*2-1:0] sum; 
+reg [15:0] clkcnt;
 reg [5:0] digcnt;
+reg [FPWID*2-1:0] qi;
+reg [FPWID+3:0] ri;
+reg [FPWID-1:0] bi;
+wire sgn;
+wire [FPWID-1:0] dif; 
+reg gotnz;					// got a non-zero digit
 
-BCDAddNClk #(.N(FPWID/2)) ubcdm1
+generate begin : gSub
+BCDSubtract #(.N(N)) ubcds1
 (
 	.clk(clk),
-	.a(pi),
+	.a(ri),
 	.b(bi),
-	.o(sum),
-	.ci(1'b0),
-	.co()
+	.o(dif),
+	.sgn(sgn)
 );
+end
+endgenerate
 
-always_ff @(posedge clk)
+reg nz;
+reg [N-1:0] zc;
+genvar g;
+generate begin : glzcnt
+	for (g = N-1; g >= 0; g = g - 1)
+	always_comb
+		zc[g] = qi[g*4+3+N*4:g*4+N*4]==0;
+end
+endgenerate
+
+integer n;
+always_comb
+begin
+	nz = 1'b0;
+	lzcnt = 'd0;
+	for (n = N-1; n >= 0; n = n - 1)
+	begin
+		nz = nz | ~zc[n];
+		if (!nz)
+			lzcnt = lzcnt + 1;
+	end
+end
+
+always @(posedge clk)
 begin
 case(st)
-ADDN:
+IDLE:
 	begin
-		clkcnt <= clkcnt + 1'd1;
-		if (ai[FPWID-1:FPWID-4]!=4'h0) begin
-			if (digcnt=='d0) begin
-				pi <= sum;
-				digcnt <= 6'd4;
-				ai[FPWID-1:FPWID-4] <= ai[FPWID-1:FPWID-4] - 1'd1;
+		qi <= 'd0;
+		ri <= 'd0;
+	end
+SUBN:
+	begin
+		digcnt <= digcnt - 1'd1;
+		if (digcnt=='d0) begin
+			clkcnt <= clkcnt + 1'd1;
+			digcnt <= 6'd10;
+			if (sgn) begin
+				ri <= {ri,qi[FPWID*2-1:FPWID*2-4]};
+				qi <= {qi[FPWID*2-5:0],cnt};
+				cnt <= 4'd0;
+				dcnt <= dcnt - 1'd1;
+				if (dcnt=='d0)
+					st <= DONE;
 			end
-			else
-				digcnt <= digcnt - 1'd1;
-		end
-		else begin
-			ai <= {ai,4'h0};
-			bi <= {4'h0,bi[FPWID*2-1:4]};
-			pi <= pi;
-			dcnt <= dcnt - 1'd1;
-			if (dcnt=='d0)
-				st <= DONE;
+			else begin
+				if (clkcnt > 600 && 1'b0) begin
+					ri <= {ri,qi[FPWID*2-1:FPWID*2-4]};
+					qi <= {qi[FPWID*2-5:0],cntm1};
+					cnt <= 4'd0;
+					dcnt <= dcnt - 1'd1;
+					if (dcnt==6'd0)
+						st <= DONE;
+				end
+				else
+				begin
+					ri <= dif;//N[0] ? dif : dif[FPWID+4-1:4];
+					cnt <= cnt + 1'd1;
+				end
+			end
 		end
 	end
 DONE:
 	begin
-		p <= pi;
+		q <= qi;
+		r <= ri;
 		done <= 1'b1;
 	end
 default:
-	st <= ADDN;
+	st <= IDLE;
 endcase
 if (ld) begin
 	clkcnt <= 10'd0;
-	digcnt <= 6'd4;
-	dcnt <= (FPWID*2)/4;
-	pi <= {FPWID*2{1'b0}};
-	ai <= a;
-	bi <= {4'h0,b,{FPWID-4{1'b0}}};
-	st <= ADDN;
+	cnt <= 4'd0;
+	digcnt <= 6'd10;
+	dcnt <= $ceil(FPWID*2/4);
+	qi <= {a,{FPWID{1'd0}}};
+	ri <= {FPWID{1'd0}};
+	bi <= b;
+	st <= SUBN;
 	done <= 1'b0;
 end
 end
 
 endmodule
 
-module dfmul_tb();
+module dfdiv_tb();
 
 reg clk;
 reg ld;
-reg [107:0] a, b;
-wire [215:0] p;
+reg [135:0] a, b;
+wire [271:0] q;
+wire [135:0] r;
+wire [7:0] lzcnt;
 
 initial begin
 	clk = 1'b0;
 	ld = 1'b0;
-	a = 108'h099_00000000_00000000_00000000;
-	b = 108'h560_00000000_00000000_00000000;
+	a = 136'h50_00000000_00000000_00000000_00000000;
+	b = 136'h50_00000000_00000000_00000000_00000000;
 	#20 ld = 1'b1;
 	#40 ld = 1'b0;
 end
 
 always #5 clk = ~clk;
 
-dfmul #(27) u1 (
+dfdiv #(.N(34)) u1 (
 	.clk(clk),
 	.ld(ld), 
 	.a(a),
 	.b(b),
-	.p(p),
-	.done(done)
+	.q(q),
+	.r(r), 
+	.done(done),
+	.lzcnt(lzcnt)
 );
 endmodule

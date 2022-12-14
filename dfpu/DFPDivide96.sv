@@ -134,7 +134,7 @@ ft_delay #(.WID(1), .DEP(1)) udly1 (.clk(clk), .ce(ce), .i(ld), .o(ld1));
 // -----------------------------------------------------------
 wire done3a,done3;
 // Perform divide
-dfdiv2 #(N+2) u2 (.clk(clk), .ld(ld1), .a({siga,8'b0}), .b({sigb,8'b0}), .q(divo), .r(), .done(done1), .lzcnt(lzcnt));
+dfdiv #(N+2) u2 (.clk(clk), .ld(ld1), .a({siga,8'b0}), .b({sigb,8'b0}), .q(divo), .r(), .done(done1), .lzcnt(lzcnt));
 //wire [7:0] lzcnt_bin = lzcnt[3:0] + (lzcnt[7:4] * 10);
 wire [(N+2)*4*2-1:0] divo1 = divo[(N+2)*4*2-1:0] << ({lzcnt-1,2'b0});//WAS FPWID=128?+44
 ft_delay #(.WID(1), .DEP(3)) u3 (.clk(clk), .ce(ce), .i(done1), .o(done3a));
@@ -154,7 +154,7 @@ reg [13:0] ex1;	// sum of exponents
 reg qNaNOut;
 
 always @(posedge clk)
-  if (ce) ex1 <= au.exp - bu.exp + bias - (({lzcnt,2'b00} > N+2) ? lzcnt-(N+2) : 0);
+  if (ce) ex1 <= au.exp - bu.exp + bias - ((lzcnt > N+2) ? lzcnt-(N+2) : 0);
 
 always @(posedge clk)
   if (ce) qNaNOut <= (az&bz)|(aInf&bInf);
@@ -248,7 +248,7 @@ delay2      #(1)   u4(.clk(clk), .ce(ce), .i(sign_exe1), .o(sign_exe));
 delay2      #(1)   u5(.clk(clk), .ce(ce), .i(inf1), .o(inf));
 delay2      #(1)   u6(.clk(clk), .ce(ce), .i(overflow1), .o(overflow));
 delay2      #(1)   u7(.clk(clk), .ce(ce), .i(underflow1), .o(underflow));
-ft_delay	#(.WID(1),.DEP(11))   u8(.clk(clk), .ce(ce), .i(done1), .o(done1a));
+ft_delay	#(.WID(1),.DEP(14))   u8(.clk(clk), .ce(ce), .i(done1), .o(done1a));
 assign done = done1&done1a;
 
 endmodule

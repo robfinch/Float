@@ -84,17 +84,7 @@ BCDSubtract #(.N(N+1)) ubcdsubn1
 	.o(odd10),
 	.sgn(odd10c)
 );
-/*
-BCDSub8NClk #(.N((N+2)/2)) ubcdsdn1
-(
-	.clk(clk),
-	.a({8'h00,oaa10}),
-	.b({8'h00,obb10}),
-	.o(odd10),
-	.ci(1'b0),
-	.co(odd10c)
-);
-*/
+
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 // Clock #1
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
@@ -352,7 +342,7 @@ ft_delay #(.WID(1), .DEP(10+RIP_STAGES)) udly11d (.clk(clk), .ce(ce), .i(bu.nan)
 ft_delay #(.WID(1), .DEP(3+RIP_STAGES)) udly11e (.clk(clk), .ce(ce), .i(op8), .o(op11));
 ft_delay #(.WID(N*4), .DEP(3+RIP_STAGES)) udly11f (.clk(clk), .ce(ce), .i(siga8), .o(siga11));
 ft_delay #(.WID(N*4), .DEP(3+RIP_STAGES)) udly11g (.clk(clk), .ce(ce), .i(sigb8), .o(sigb11));
-ft_delay #(.WID(1), .DEP(1+RIP_STAGES)) udly11h (.clk(clk), .ce(ce), .i(xo10==14'h2FFF), .o(xoinf11));
+ft_delay #(.WID(1), .DEP(1+RIP_STAGES)) udly11h (.clk(clk), .ce(ce), .i(xo10==12'hBFF), .o(xoinf11));
 ft_delay #(.WID((N+1)*4+1), .DEP(1+RIP_STAGES)) udly11i (.clk(clk), .ce(ce), .i(realOp10 ? {odd10c,odd10} : {oss10c,oss10}), .o({mab11c,mab11}));
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
