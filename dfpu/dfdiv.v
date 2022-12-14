@@ -58,13 +58,14 @@ parameter SUBN = 2'd1;
 parameter DONE = 2'd2;
 
 reg [3:0] cnt;				// iteration count
+wire [3:0] cntm1 = cnt;//cnt==4'd0 ? 4'd9 : cnt-1'd1;
 reg [7:0] dcnt;				// digit count
 reg [15:0] clkcnt;
 reg [5:0] digcnt;
 reg [FPWID*2-1:0] qi = 0;
 reg [FPWID+4-1:0] ri = 0;
 reg [FPWID-1:0] bi = 0;
-wire co;
+wire sgn;
 wire [FPWID+4-1:0] dif; 
 reg gotnz;					// got a non-zero digit
 (* retiming_forward = 1 *)
@@ -73,17 +74,33 @@ wire [FPWID+4-1:0] dif1;
 wire co1;
 
 generate begin : gSub
-BCDSub8NClk #(.N((N+2)/2)) ubcds1
+BCDSubtract #(.N(N+1)) ubcds1
 (
 	.clk(clk),
-	.a(~N[0] ? {ri,4'h0} : ri),
-	.b(~N[0] ? {4'd0,bi,4'h0} : {4'd0,bi}),
+	.a(ri),
+	.b({4'd0,bi}),
 	.o(dif),
-	.ci(1'b0),
-	.co(co)
+	.sgn(sgn)
 );
 end
 endgenerate
+
+/*
+BCDSRL #(.N(N*2)) ushr1 (
+	.ci(1'b0),
+	.i(qi),
+	.o(q),
+	.co()
+);
+*/
+/*
+BCDSRL #(.N(N)) ushr2 (
+	.ci(1'b0),
+	.i(ri),
+	.o(r),
+	.co()
+);
+*/
 
 always @(posedge clk)
 begin
@@ -93,13 +110,13 @@ SUBN:
 		digcnt <= digcnt - 1'd1;
 		if (digcnt=='d0) begin
 			clkcnt <= clkcnt + 1'd1;
-			digcnt <= 6'd4;
-			if (co) begin
+			digcnt <= 6'd8;
+			if (sgn) begin
 				ri <= {ri,qi[FPWID*2-1:FPWID*2-4]};
-				qi <= {qi[FPWID*2-5:0],cnt};
+				qi <= {qi[FPWID*2-5:0],cntm1};
 				cnt <= 4'd0;
 				dcnt <= dcnt - 1'd1;
-				if (dcnt==6'd0)
+				if (dcnt=='d0)
 					st <= DONE;
 				if (dcnt <= FPWID/4) begin
 					if (|cnt)
@@ -115,7 +132,7 @@ SUBN:
 			else begin
 				if (clkcnt > 600) begin
 					ri <= {ri,qi[FPWID*2-1:FPWID*2-4]};
-					qi <= {qi[FPWID*2-5:0],cnt};
+					qi <= {qi[FPWID*2-5:0],cntm1};
 					cnt <= 4'd0;
 					dcnt <= dcnt - 1'd1;
 					if (dcnt==6'd0)
@@ -136,7 +153,7 @@ SUBN:
 				end
 				else
 				begin
-					ri <= N[0] ? dif : dif[FPWID+4-1:4];
+					ri <= dif;//N[0] ? dif : dif[FPWID+4-1:4];
 					cnt <= cnt + 1'd1;
 				end
 			end
@@ -154,9 +171,9 @@ endcase
 if (ld) begin
 	clkcnt <= 10'd0;
 	cnt <= 4'd0;
-	digcnt <= 6'd4;
+	digcnt <= 6'd8;
 	dcnt <= $ceil((FPWID*2)/4);
-	qi <= {a,{FPWID{1'd0}}};
+	qi <= {a,{FPWID*2{1'd0}}};
 	ri <= {FPWID{1'd0}};
 	bi <= b;
 	st <= SUBN;
@@ -180,8 +197,8 @@ wire [7:0] lzcnt;
 initial begin
 	clk = 1'b0;
 	ld = 1'b0;
-	a = 136'h10_00000000_00000000_00000000_00000000;
-	b = 136'h20_00000000_00000000_00000000_00000000;
+	a = 136'h50_00000000_00000000_00000000_00000000;
+	b = 136'h50_00000000_00000000_00000000_00000000;
 	#20 ld = 1'b1;
 	#40 ld = 1'b0;
 end

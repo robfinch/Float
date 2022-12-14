@@ -66,15 +66,15 @@ reg [FPWID*2-1:0] qi;
 reg [FPWID+3:0] ri;
 reg [FPWID-1:0] bi;
 wire sgn;
-wire [FPWID-1:0] dif; 
+wire [FPWID+3:0] dif; 
 reg gotnz;					// got a non-zero digit
 
 generate begin : gSub
-BCDSubtract #(.N(N)) ubcds1
+BCDSubtract #(.N(N+1)) ubcds1
 (
 	.clk(clk),
 	.a(ri),
-	.b(bi),
+	.b({4'b0,bi}),
 	.o(dif),
 	.sgn(sgn)
 );
@@ -118,7 +118,7 @@ SUBN:
 		if (digcnt=='d0) begin
 			clkcnt <= clkcnt + 1'd1;
 			digcnt <= 6'd10;
-			if (sgn) begin
+			if (bi > ri) begin
 				ri <= {ri,qi[FPWID*2-1:FPWID*2-4]};
 				qi <= {qi[FPWID*2-5:0],cnt};
 				cnt <= 4'd0;
@@ -127,7 +127,7 @@ SUBN:
 					st <= DONE;
 			end
 			else begin
-				if (clkcnt > 600 && 1'b0) begin
+				if (clkcnt > 600 && 0) begin
 					ri <= {ri,qi[FPWID*2-1:FPWID*2-4]};
 					qi <= {qi[FPWID*2-5:0],cntm1};
 					cnt <= 4'd0;
