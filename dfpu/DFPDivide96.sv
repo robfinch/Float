@@ -154,7 +154,7 @@ reg [13:0] ex1;	// sum of exponents
 reg qNaNOut;
 
 always @(posedge clk)
-  if (ce) ex1 <= au.exp - bu.exp + bias - ((lzcnt > N+2) ? lzcnt-(N+2) : 0);
+  if (ce) ex1 <= au.exp - bu.exp + bias - ((lzcnt >= N) ? lzcnt-N-1 : 0);
 
 always @(posedge clk)
   if (ce) qNaNOut <= (az&bz)|(aInf&bInf);
