@@ -191,4 +191,45 @@ typedef struct packed
 	logic [127:0] sig;		// significand 32 digits
 } DFP64UD;
 
+typedef struct packed
+{
+	logic sign;
+	logic [4:0] combo;
+	logic [5:0] expc;		// exponent continuation field
+	logic [19:0] sigc;	// significand continuation field
+} DFP32;
+
+typedef struct packed
+{
+	logic nan;
+	logic qnan;
+	logic snan;
+	logic infinity;
+	logic sign;
+	logic [7:0] exp;
+	logic [27:0] sig;		// significand 7 digits
+} DFP32U;
+
+typedef struct packed
+{
+	logic nan;
+	logic qnan;
+	logic snan;
+	logic infinity;
+	logic sign;
+	logic [7:0] exp;
+	logic [31:0] sig;		// significand 8 digits
+} DFP32UN;
+
+typedef struct packed
+{
+	logic nan;
+	logic qnan;
+	logic snan;
+	logic infinity;
+	logic sign;
+	logic [7:0] exp;
+	logic [55:0] sig;		// significand 14 digits
+} DFP32UD;
+
 endpackage

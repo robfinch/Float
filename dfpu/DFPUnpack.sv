@@ -80,3 +80,18 @@ DPDDecodeN #(.N(5)) u1 (i.sigc, o.sig[59:0]);
 assign o.sig[63:60] = i.combo[4:3]==2'b11 ? {3'b100,i.combo[0]} : {1'b0,i.combo[2:0]};
 
 endmodule
+
+module DFPUnpack32(i, o);
+input DFP32 i;
+output DFP32U o;
+
+assign o.sign = i.sign;
+assign o.exp = {i.combo[4:3]==2'b11 ? i.combo[2:1] : i.combo[4:3],i.expc};
+assign o.nan = i.combo==5'b11111;
+assign o.qnan = i.combo==5'b11111 && i.expc[7]==1'b0;
+assign o.snan = i.combo==5'b11111 && i.expc[7]==1'b1;
+assign o.infinity = i.combo==5'b11110;
+DPDDecodeN #(.N(2)) u1 (i.sigc, o.sig[23:0]);
+assign o.sig[27:24] = i.combo[4:3]==2'b11 ? {3'b100,i.combo[0]} : {1'b0,i.combo[2:0]};
+
+endmodule
