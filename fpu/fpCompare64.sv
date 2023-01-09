@@ -50,8 +50,9 @@ fpDecomp64 u2(.i(b), .sgn(sb), .exp(xb), .man(mb), .vz(bz), .qnan(), .snan(), .n
 wire unordered = nan_a | nan_b;
 
 wire eq = !unordered & ((az & bz) || (a==b));	// special test for zero
-wire gt1 = {xa,ma} > {xb,mb} | infa;
-wire lt1 = {xa,ma} < {xb,mb} | infb;
+wire ne = !((az & bz) || (a==b));	// special test for zero
+wire gt1 = ({xa,ma} > {xb,mb}) | infa;
+wire lt1 = ({xa,ma} < {xb,mb}) | infb;
 
 wire lt = sa ^ sb ? sa & !(az & bz): sa ? gt1 : lt1;
 
@@ -59,14 +60,14 @@ always_comb
 begin
 	o = 'd0;
 	o[0] = eq;
-	o[1] = lt;
-	o[2] = lt|eq;
+	o[1] = lt & !unordered;
+	o[2] = (lt|eq) & !unordered;
 	o[3] = lt1;
 	o[4] = unordered;
 	o[7:5] = 3'd0;
-	o[8] = ~eq;
-	o[9] = ~lt;
-	o[10] = ~(lt|eq);
+	o[8] = ne;
+	o[9] = ~lt & !unordered;
+	o[10] = ~(lt|eq) & !unordered;
 	o[11] = ~lt1;
 	o[12] = ~unordered;
 end
