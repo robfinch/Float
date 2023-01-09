@@ -1,11 +1,11 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2007-2023  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2023  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	fpCompare128.sv
+//	fpCompare80.sv
 //    - floating point comparison unit
 //    - IEEE 754 representation
 //
@@ -25,29 +25,32 @@
 //                                                                          
 // ============================================================================
 
-import fp128Pkg::*;
+import fp80Pkg::*;
 
-module fpCompare128(a, b, o, nan, snan);
-input FP128 a, b;
+module fpCompare80(a, b, o, nan, snan, inf);
+input FP80 a, b;
 output [15:0] o;
 reg [15:0] o;
 output nan;
 output snan;
+output inf;
 
 // Decompose the operands
 wire sa;
 wire sb;
-wire [fp128Pkg::EMSB:0] xa;
-wire [fp128Pkg::EMSB:0] xb;
-wire [fp128Pkg::FMSB:0] ma;
-wire [fp128Pkg::FMSB:0] mb;
+wire [fp80Pkg::EMSB:0] xa;
+wire [fp80Pkg::EMSB:0] xb;
+wire [fp80Pkg::FMSB:0] ma;
+wire [fp80Pkg::FMSB:0] mb;
 wire az, bz;
 wire nan_a, nan_b;
+wire infa, infb;
 
-fpDecomp128 u1(.i(a), .sgn(sa), .exp(xa), .man(ma), .vz(az), .qnan(), .snan(), .nan(nan_a) );
-fpDecomp128 u2(.i(b), .sgn(sb), .exp(xb), .man(mb), .vz(bz), .qnan(), .snan(), .nan(nan_b) );
+fpDecomp80 u1(.i(a), .sgn(sa), .exp(xa), .man(ma), .vz(az), .inf(infa), .qnan(), .snan(), .nan(nan_a) );
+fpDecomp80 u2(.i(b), .sgn(sb), .exp(xb), .man(mb), .vz(bz), .inf(infb), .qnan(), .snan(), .nan(nan_b) );
 
 wire unordered = nan_a | nan_b;
+assign inf = infa | infb;
 
 wire eq = !unordered & ((az & bz) || (a==b));	// special test for zero
 wire gt1 = {xa,ma} > {xb,mb} | infa;
@@ -73,7 +76,7 @@ end
 
 // an unorder comparison will signal a nan exception
 //assign nanx = op!=`FCOR && op!=`FCUN && unordered;
-assign nan = nan_a|nan_b|(infa & infb);
-assign snan = (nan_a & ~ma[fp128Pkg::FMSB]) | (nan_b & ~mb[fp128Pkg::FMSB]);
+assign nan = nan_a|nan_b | (infa & infb);
+assign snan = (nan_a & ~ma[fp80Pkg::FMSB]) | (nan_b & ~mb[fp80Pkg::FMSB]);
 
 endmodule

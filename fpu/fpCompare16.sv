@@ -1,6 +1,6 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2007-2022  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2007-2023  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
@@ -50,8 +50,8 @@ fpDecomp16 u2(.i(b), .sgn(sb), .exp(xb), .man(mb), .vz(bz), .qnan(), .snan(), .n
 wire unordered = nan_a | nan_b;
 
 wire eq = !unordered & ((az & bz) || (a==b));	// special test for zero
-wire gt1 = {xa,ma} > {xb,mb};
-wire lt1 = {xa,ma} < {xb,mb};
+wire gt1 = {xa,ma} > {xb,mb} |infa;
+wire lt1 = {xa,ma} < {xb,mb} |infb;
 
 wire lt = sa ^ sb ? sa & !(az & bz): sa ? gt1 : lt1;
 
@@ -73,7 +73,7 @@ end
 
 // an unorder comparison will signal a nan exception
 //assign nanx = op!=`FCOR && op!=`FCUN && unordered;
-assign nan = nan_a|nan_b;
+assign nan = nan_a|nan_b|(infa & infb);
 assign snan = (nan_a & ~ma[fp16Pkg::FMSB]) | (nan_b & ~mb[fp16Pkg::FMSB]);
 
 endmodule
