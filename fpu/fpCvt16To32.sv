@@ -1,13 +1,13 @@
 `timescale 1ns / 1ps
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2006-2022  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2023  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	fpCvt32To64.sv
-//    - decimal floating convert single to double
+//	fpCvt16To32.sv
+//    - decimal floating convert half to single
 //
 //
 // BSD 3-Clause License
@@ -38,24 +38,24 @@
 //
 // ============================================================================
 
+import fp16Pkg::*;
 import fp32Pkg::*;
-import fp96Pkg::*;
 
-module fpCvt32To64(i, o);
-input FP32 i;
-output FP64 o;
+module fpCvt16To32(i, o);
+input FP16 i;
+output FP32 o;
 
-wire [10:0] bias64 = 11'h3FF;
 wire [ 7:0] bias32 = 8'h7F;
+wire [ 4:0] bias16 = 5'h0F;
 
 always_comb
 	o.sign = i.sign;
 always_comb
-	if (i.exp==8'hFF)	// Keep infinity / nan status
-		o.exp = 11'h7FF;
+	if (i.exp==5'h1F)	// Keep infinity / nan status
+		o.exp = 8'hFF;
 	else
-		o.exp = bias64 - bias32 + i.exp;
+		o.exp = bias32 - bias16 + i.exp;
 always_comb
-	o.sig = {i.sig,29'd0};
+	o.sig = {i.sig,13'd0};
 
 endmodule
