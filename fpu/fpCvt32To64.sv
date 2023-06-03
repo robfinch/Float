@@ -39,7 +39,7 @@
 // ============================================================================
 
 import fp32Pkg::*;
-import fp96Pkg::*;
+import fp64Pkg::*;
 
 module fpCvt32To64(i, o);
 input FP32 i;

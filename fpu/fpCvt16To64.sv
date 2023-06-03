@@ -56,6 +56,6 @@ always_comb
 	else
 		o.exp = bias64 - bias16 + i.exp;
 always_comb
-	o.sig = {i.sig,29'd0};
+	o.sig = {i.sig,43'd0};
 
 endmodule

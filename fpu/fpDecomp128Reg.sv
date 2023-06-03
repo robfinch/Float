@@ -64,7 +64,7 @@ input clk;
 input ce;
 input FP128 i;
 
-output reg FP128 o;
+output FP128 o;
 output reg sgn;
 output reg [fp128Pkg::EMSB:0] exp;
 output reg [fp128Pkg::FMSB:0] man;
@@ -79,7 +79,7 @@ output reg snan;	// signalling nan
 output reg nan;
 
 // Decompose input
-always @(posedge clk)
+always_ff @(posedge clk)
 	if (ce) begin
 		o <= i;
 		sgn = i.sign;

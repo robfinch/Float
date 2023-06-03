@@ -27,10 +27,11 @@
 
 import fp32Pkg::*;
 
-module fpCompare32(a, b, o, nan, snan);
+module fpCompare32(a, b, o, inf, nan, snan);
 input FP32 a, b;
 output [15:0] o;
 reg [15:0] o;
+output inf;
 output nan;
 output snan;
 
@@ -43,16 +44,17 @@ wire [fp32Pkg::FMSB:0] ma;
 wire [fp32Pkg::FMSB:0] mb;
 wire az, bz;
 wire nan_a, nan_b;
+wire infa, infb;
 
-fpDecomp32 u1(.i(a), .sgn(sa), .exp(xa), .man(ma), .vz(az), .qnan(), .snan(), .nan(nan_a) );
-fpDecomp32 u2(.i(b), .sgn(sb), .exp(xb), .man(mb), .vz(bz), .qnan(), .snan(), .nan(nan_b) );
+fpDecomp32 u1(.i(a), .sgn(sa), .exp(xa), .man(ma), .vz(az), .inf(infa), .qnan(), .snan(), .nan(nan_a) );
+fpDecomp32 u2(.i(b), .sgn(sb), .exp(xb), .man(mb), .vz(bz), .inf(infb), .qnan(), .snan(), .nan(nan_b) );
 
 wire unordered = nan_a | nan_b;
 
 wire eq = !unordered & ((az & bz) || (a==b));	// special test for zero
 wire ne = !((az & bz) || (a==b));	// special test for zero
-wire gt1 = ({xa,ma} > {xb,mb}) | infa;
-wire lt1 = ({xa,ma} < {xb,mb}) | infb;
+wire gt1 = ({xa,ma} > {xb,mb}) | (infa & ~binf);
+wire lt1 = ({xa,ma} < {xb,mb}) | (infb & ~ainf);
 
 wire lt = sa ^ sb ? sa & !(az & bz): sa ? gt1 : lt1;
 
@@ -76,5 +78,6 @@ end
 //assign nanx = op!=`FCOR && op!=`FCUN && unordered;
 assign nan = nan_a|nan_b|(infa & infb);
 assign snan = (nan_a & ~ma[fp32Pkg::FMSB]) | (nan_b & ~mb[fp32Pkg::FMSB]);
+assign inf = infa & infb;
 
 endmodule
