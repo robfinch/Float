@@ -49,10 +49,10 @@ FP64 aa;
 FP64X sinx, cosx;
 wire FP64N fpn_sin, fpn_cos;
 reg [59:0] phase_i;
-wire [EMSB:0] exp;
-reg [EMSB:0] exp1,exp2,exp3,exp4;
-wire [FMSB+1:0] fract;
-reg [FMSB+10:0] fract1,fract2,fract3,fract4;
+wire [fp64Pkg::EMSB:0] exp;
+reg [fp64Pkg::EMSB:0] exp1,exp2,exp3,exp4;
+wire [fp64Pkg::FMSB+1:0] fract;
+reg [fp64Pkg::FMSB+10:0] fract1,fract2,fract3,fract4;
 wire [53:0] xval, yval;
 wire [59:0] phase;
 wire nan;
@@ -178,7 +178,7 @@ fpCordic u1
 	.clk(clk),
 	.arctan(1'b0),
 	.ld(ld5),
-	.phase_i({fract4[FMSB+8:0],1'b0}),
+	.phase_i({fract4[fp64Pkg::FMSB+8:0],1'b0}),
 	.xval_i(54'h10000000000000),
 	.yval_i(54'h00000000000000),
 	.xval_o(xval),

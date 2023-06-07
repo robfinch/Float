@@ -307,7 +307,7 @@ integer n2;
 always_comb
 begin
   St6 = 1'b0;
-  for (n2 = 0; n2 < FMSB+5; n2 = n2 + 1)
+  for (n2 = 0; n2 < fp64Pkg::FMSB+5; n2 = n2 + 1)
     if (n2 <= rshiftAmt6 + 1) St6 = St6|mo6[n2];
 end
 always_comb
@@ -335,7 +335,7 @@ always_comb
 
 assign o.sign = so;
 assign o.exp = xo;
-assign o.sig = mo[FMSB+5:2];
+assign o.sig = mo[fp64Pkg::FMSB+5:2];
 
 endmodule
 	

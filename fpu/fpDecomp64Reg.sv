@@ -54,7 +54,7 @@ assign xinf = &exp;
 assign qnan = &exp &  man[fp64Pkg::FMSB];
 assign snan = &exp & !man[fp64Pkg::FMSB] & !mz;
 assign nan = &exp & !mz;
-assign fract = {!xz,i[FMSB:0]};
+assign fract = {!xz,i[fp64Pkg::FMSB:0]};
 
 endmodule
 

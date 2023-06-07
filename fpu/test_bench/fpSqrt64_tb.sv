@@ -1,12 +1,13 @@
+`timescale 1ns / 1ps
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2019-2022  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2018-2023  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	fpScaleb64.sv
-//		- floating point Scaleb()
+//	fpSqrt64_tb.v
+//		- floating point square root test bench
 //
 // BSD 3-Clause License
 // Redistribution and use in source and binary forms, with or without
@@ -36,79 +37,83 @@
 //                                                                          
 // ============================================================================
 
-import fp64Pkg::*;
+module fpSqrt64_tb();
+reg rst;
+reg clk;
+reg clk2x;
+reg clk4x;
+reg [12:0] adr;
+reg [191:0] memd [0:8191];
+reg [127:0] memdo [0:9000];
+reg [127:0] memdo1 [0:9000];
+reg [31:0] a,a6;
+reg [63:0] ad;
+real cd;
+wire [31:0] a5;
+wire [31:0] o;
+wire [63:0] od;
+reg [79:0] adx;
+wire [79:0] odx;
+reg ld;
+wire done;
+reg [3:0] state;
+reg [7:0] count;
 
-module fpScaleb64(clk, ce, a, b, o);
-input clk;
-input ce;
-input FP64 a;
-input FP64 b;
-output FP64 o;
-
-wire [4:0] cmp_o;
-wire nana, nanb;
-wire xza, mza;
-
-wire [fp64Pkg::EMSB:0] infXp = {fp64Pkg::EMSB+1{1'b1}};
-wire [fp64Pkg::EMSB:0] xa;
-wire xinfa;
-wire anan;
-reg anan1;
-wire sa;
-reg sa1, sa2;
-wire [fp64Pkg::FMSB:0] ma;
-reg [fp64Pkg::EMSB+1:0] xa1a, xa1b, xa2;
-reg [fp64Pkg::FMSB:0] ma1, ma2;
-wire bs = b.sign;
-reg bs1;
-
-fpDecomp64 u1 (.i(a), .sgn(sa), .exp(xa), .man(ma), .fract(), .xz(xza), .mz(), .vz(), .inf(), .xinf(xinfa), .qnan(), .snan(), .nan(anan));
-
-// ----------------------------------------------------------------------------
-// Clock cycle 1
-// ----------------------------------------------------------------------------
-always @(posedge clk)
-	if (ce) xa1a <= xa;
-always @(posedge clk)
-	if (ce) xa1b <= xa + b;
-always @(posedge clk)
-	if (ce) bs1 <= bs;
-always @(posedge clk)
-	if (ce) anan1 <= anan;
-always @(posedge clk)
-	if (ce) sa1 <= sa;
-always @(posedge clk)
-	if (ce) ma1 <= ma;
-
-// ----------------------------------------------------------------------------
-// Clock cycle 2
-// ----------------------------------------------------------------------------
-always @(posedge clk)
-	if (ce) sa2 <= sa1;
-always @(posedge clk)
-if (ce) begin
-	if (anan1) begin
-		xa2 <= xa1a;
-		ma2 <= ma1;
-	end
-	// Underflow? -> limit exponent to zero
-	else if (bs1 & xa1b[fp64Pkg::EMSB+1]) begin
-		xa2 <= 1'd0;
-		ma2 <= ma1;
-	end
-	// overflow ? -> set value to infinity
-	else if (~bs1 & xa1b[fp64Pkg::EMSB+1]) begin
-		xa2 <= infXp;
-		ma2 <= 1'd0;
-	end
-	else begin
-		xa2 <= xa1b;
-		ma2 <= ma1;
-	end
+initial begin
+	rst = 1'b0;
+	clk = 1'b0;
+	clk2x = 1'b0;
+	clk4x = 0;
+	$readmemh("f:/cores2023/Float/fpu/test_bench/data/fpSqrt64_tv.txt", memd);
+	#20 rst = 1;
+	#50 rst = 0;
 end
 
-assign o.sign = sa2;
-assign o.exp = xa2;
-assign o.sig = ma2;
+always #8
+	clk = ~clk;
+always #4
+	clk2x = ~clk2x;
+
+always_ff @(posedge clk)
+if (rst) begin
+	adr <= 0;
+	state <= 1;
+	count <= 0;
+end
+else
+begin
+	ld <= 1'b0;
+case(state)
+4'd1:
+	begin
+		count <= 8'd0;
+		ad <= memd[adr][63:0];
+		ld <= 1'b1;
+		state <= 2;
+	end
+4'd2:
+	begin
+		if (count==8'd2)
+			cd <= $sqrt($bitstoreal(ad));
+		count <= count + 2'd1;
+		if (count==8'd72) begin
+			memdo[adr] <= {od,ad};
+			memdo1[adr] <= {$realtobits(cd),ad};
+			adr <= adr + 1;
+			if (adr==8191) begin
+				$writememh("f:/cores2023/Float/fpu/test_bench/data/fpSqrt64_dut_tvo.txt", memdo);
+				$writememh("f:/cores2023/Float/fpu/test_bench/data/fpSqrt64_tb_tvo.txt", memdo1);
+				$finish;
+			end
+			state <= 3;
+		end
+	end
+4'd3:	state <= 4;
+4'd4:	state <= 5;
+4'd5:	state <= 1;
+endcase
+end
+
+fpSqrt64nr u2 (rst, clk, clk2x, 1'b1, ld, ad, od, 3'b000, done);//, sign_exe, inf, overflow, underflow);
 
 endmodule

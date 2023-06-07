@@ -34,34 +34,34 @@ input clk;
 input ce;
 input op;						// 1 = signed, 0 = unsigned
 input [2:0] rm;			// rounding mode
-input [FPWID-1:0] i;		// integer input
-output [FPWID-1:0] o;		// float output
+input [fp64Pkg::FPWID-1:0] i;		// integer input
+output [fp64Pkg::FPWID-1:0] o;		// float output
 
-wire [EMSB:0] zeroXp = {EMSB{1'b1}};
+wire [fp64Pkg::EMSB:0] zeroXp = {fp64Pkg::EMSB{1'b1}};
 
 wire iz;			// zero input ?
-wire [MSB:0] imag;	// get magnitude of i
-wire [MSB:0] imag1 = (op & i[MSB]) ? -i : i;
+wire [fp64Pkg::MSB:0] imag;	// get magnitude of i
+wire [fp64Pkg::MSB:0] imag1 = (op & i[fp64Pkg::MSB]) ? -i : i;
 wire [7:0] lz;		// count the leading zeros in the number
-wire [EMSB:0] wd;	// compute number of whole digits
+wire [fp64Pkg::EMSB:0] wd;	// compute number of whole digits
 wire so;			// copy the sign of the input (easy)
 wire [2:0] rmd;
 
 delay1 #(3)   u0 (.clk(clk), .ce(ce), .i(rm),     .o(rmd) );
 delay1 #(1)   u1 (.clk(clk), .ce(ce), .i(i==0),   .o(iz) );
-delay1 #(FPWID) u2 (.clk(clk), .ce(ce), .i(imag1),  .o(imag) );
+delay1 #(fp64Pkg::FPWID) u2 (.clk(clk), .ce(ce), .i(imag1),  .o(imag) );
 delay1 #(1)   u3 (.clk(clk), .ce(ce), .i(i[MSB]), .o(so) );
 cntlz128Reg    u4 (.clk(clk), .ce(ce), .i(imag1), .o(lz[5:0]) );
 assign lz[7:6]=2'b00;
 
-assign wd = zeroXp - 1 + FPWID - lz;	// constant except for lz
+assign wd = zeroXp - 1 + fp64Pkg::FPWID - lz;	// constant except for lz
 
-wire [EMSB:0] xo = iz ? 0 : wd;
-wire [MSB:0] simag = imag << lz;		// left align number
+wire [fp64Pkg::EMSB:0] xo = iz ? 0 : wd;
+wire [fp64Pkg::MSB:0] simag = imag << lz;		// left align number
 
-wire g =  simag[EMSB+2];	// guard bit (lsb)
-wire r =  simag[EMSB+1];	// rounding bit
-wire s = |simag[EMSB:0];	// "sticky" bit
+wire g =  simag[fp64Pkg::EMSB+2];	// guard bit (lsb)
+wire r =  simag[fp64Pkg::EMSB+1];	// rounding bit
+wire s = |simag[fp64Pkg::EMSB:0];	// "sticky" bit
 reg rnd;
 
 // Compute the round bit
@@ -77,7 +77,7 @@ always @(rmd,g,r,s,so)
 
 // "hide" the leading one bit = MSB-1
 // round the result
-wire [FMSB:0] mo = simag[MSB-1:EMSB+1]+rnd;
+wire [fp64Pkg::FMSB:0] mo = simag[fp64Pkg::MSB-1:fp64Pkg::EMSB+1]+rnd;
 
 assign o = {op & so,xo,mo};
 
