@@ -57,7 +57,9 @@ wire [53:0] xval, yval;
 wire [59:0] phase;
 wire nan;
 wire cdone;
+wire done;
 wire vz;
+wire sgn;
 reg ld1, ld2, ld3, ld4, ld5;
 
 fpDecomp64Reg u4

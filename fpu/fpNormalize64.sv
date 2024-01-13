@@ -99,6 +99,7 @@ always @(posedge clk)
 wire xInf2c, xInf2b;
 wire [fp64Pkg::EMSB:0] xo2;
 reg incExpByOne2, incExpByTwo2;
+wire under2;
 ft_delay #(.WID(1),.DEP(1)) u21 (.clk(clk), .ce(ce), .i(xInf1c), .o(xInf2c));
 ft_delay #(.WID(1),.DEP(1)) u22 (.clk(clk), .ce(ce), .i(xInf1b), .o(xInf2b));
 ft_delay #(.WID(fp64Pkg::EMSB+1),.DEP(2)) u23 (.clk(clk), .ce(ce), .i(xo0), .o(xo2));

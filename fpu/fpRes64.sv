@@ -305,6 +305,7 @@ cres[255]=20'h1000;
 cres256=20'h007fc;
 end
 
+wire sa;
 wire [fp64Pkg::EMSB:0] xa;
 wire [fp64Pkg::FMSB:0] ma;
 reg [fp64Pkg::FMSB:0] ma3;
