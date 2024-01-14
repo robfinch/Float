@@ -162,7 +162,7 @@ wire [fp16Pkg::EX:0] o1;
 wire inf1;
 wire [fp16Pkg::MSB+3:0] fpn0;
 wire done1;
-assign inf1 = &o[62:52] && ~|o[51:0];
+assign inf1 = &o[14:10] && ~|o[9:0];
 fpSqrt16 u1 (rst, clk, clk2x, ce, ld, a, o1, done1, sqrinf, sqrneg);
 fpNormalize16 u2(.clk(clk), .ce(ce), .under_i(1'b0), .i(o1), .o(fpn0) );
 fpRound16     u3(.clk(clk), .ce(ce), .rm(rm), .i(fpn0), .o(o) );

@@ -162,7 +162,7 @@ wire [fp32Pkg::EX:0] o1;
 wire inf1;
 wire [fp32Pkg::MSB+3:0] fpn0;
 wire done1;
-assign inf1 = &o[62:52] && ~|o[51:0];
+assign inf1 = &o[30:23] && ~|o[22:0];
 fpSqrt32 u1 (rst, clk, clk2x, ce, ld, a, o1, done1, sqrinf, sqrneg);
 fpNormalize32 u2(.clk(clk), .ce(ce), .under_i(1'b0), .i(o1), .o(fpn0) );
 fpRound32     u3(.clk(clk), .ce(ce), .rm(rm), .i(fpn0), .o(o) );
