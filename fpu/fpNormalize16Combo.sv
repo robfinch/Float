@@ -315,7 +315,7 @@ always_comb
 always_comb
 begin
   St6 = 1'b0;
-  for (n = 0; n < FMSB+5; n = n + 1)
+  for (n = 0; n < fp16Pkg::FMSB+5; n = n + 1)
     if (n <= rshiftAmt6 + 1) St6 = St6|mo6[n];
 end
 always_comb

@@ -43,7 +43,7 @@ input clk;
 input ce;
 input FP32 a;
 input FP32 b;
-output reg FP32 o;
+output FP32 o;
 
 wire [4:0] cmp_o;
 wire nana, nanb;

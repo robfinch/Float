@@ -213,7 +213,7 @@ always_comb
 	cInf5 <= cInf1;
 
 // determine when a NaN is output
-reg [MSB:0] a5,b5;
+FP16 a5,b5;
 always_comb
 	qNaNOut5 <= (aInf1&bz1)|(bInf1&az1);
 always_comb
@@ -263,7 +263,7 @@ always_comb
 	casez({aNan5,bNan5,qNaNOut5,aInf5,bInf5,over5})
 	6'b1?????:  mo6 <= {1'b1,1'b1,a5[fp16Pkg::FMSB-1:0],{fp16Pkg::FMSB+1{1'b0}}};
   6'b01????:  mo6 <= {1'b1,1'b1,b5[fp16Pkg::FMSB-1:0],{fp16Pkg::FMSB+1{1'b0}}};
-	6'b001???:	mo6 <= {1'b1,qNaN|3'd4,{FMSB+1{1'b0}}};	// multiply inf * zero
+	6'b001???:	mo6 <= {1'b1,qNaN|3'd4,{fp16Pkg::FMSB+1{1'b0}}};	// multiply inf * zero
 	6'b0001??:	mo6 <= 0;	// mul inf's
 	6'b00001?:	mo6 <= 0;	// mul inf's
 	6'b000001:	mo6 <= 0;	// mul overflow
@@ -300,7 +300,7 @@ always_comb
 always_comb
 	ma_gt_mc7 <= mo6 > {fractc6,{fp16Pkg::FMSB+1{1'b0}}};
 always_comb
-	meq7 <= mo6 == {fractc6,{FMSB+1{1'b0}}};
+	meq7 <= mo6 == {fractc6,{fp16Pkg::FMSB+1{1'b0}}};
 always_comb
 	az7 <= az5;
 always_comb

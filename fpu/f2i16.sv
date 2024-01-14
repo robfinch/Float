@@ -36,30 +36,30 @@ module f2i16(clk, ce, op, i, o, overflow);
 input clk;
 input ce;
 input op;					// 1 = signed, 0 = unsigned
-input [MSB:0] i;
-output [MSB:0] o;
+input FP16 i;
+output [fp16Pkg::MSB:0] o;
 output overflow;
 
-wire [MSB:0] maxInt  = op ? {MSB{1'b1}} : {FPWID{1'b1}};		// maximum integer value
-wire [EMSB:0] zeroXp = {EMSB{1'b1}};	// simple constant - value of exp for zero
+wire [fp16Pkg::MSB:0] maxInt  = op ? {fp16Pkg::MSB{1'b1}} : {fp16Pkg::FPWID{1'b1}};		// maximum integer value
+wire [fp16Pkg::EMSB:0] zeroXp = {fp16Pkg::EMSB{1'b1}};	// simple constant - value of exp for zero
 
 // Decompose fp value
 reg sgn;									// sign
 always_ff @(posedge clk)
-	if (ce) sgn = i[MSB];
-wire [EMSB:0] exp = i[MSB-1:FMSB+1];		// exponent
-wire [FMSB+1:0] man = {exp!=0,i[FMSB:0]};	// mantissa including recreate hidden bit
+	if (ce) sgn = i[fp16Pkg::MSB];
+wire [fp16Pkg::EMSB:0] exp = i[fp16Pkg::MSB-1:fp16Pkg::FMSB+1];		// exponent
+wire [fp16Pkg::FMSB+1:0] man = {exp!=0,i[fp16Pkg::FMSB:0]};	// mantissa including recreate hidden bit
 
-wire iz = i[MSB-1:0]==0;					// zero value (special)
+wire iz = i[fp16Pkg::MSB-1:0]==0;					// zero value (special)
 
-assign overflow  = exp - zeroXp > (op ? MSB : FPWID);		// lots of numbers are too big - don't forget one less bit is available due to signed values
+assign overflow  = exp - zeroXp > (op ? fp16Pkg::MSB : fp16Pkg::FPWID);		// lots of numbers are too big - don't forget one less bit is available due to signed values
 wire underflow = exp < zeroXp - 1;			// value less than 1/2
 
-wire [7:0] shamt = (op ? MSB : FPWID) - (exp - zeroXp);	// exp - zeroXp will be <= MSB
+wire [7:0] shamt = (op ? fp16Pkg::MSB : fp16Pkg::FPWID) - (exp - zeroXp);	// exp - zeroXp will be <= MSB
 
-wire [MSB+1:0] o1 = {man,{EMSB+1{1'b0}},1'b0} >> shamt;	// keep an extra bit for rounding
-wire [MSB:0] o2 = o1[MSB+1:1] + o1[0];		// round up
-reg [MSB:0] o3;
+wire [fp16Pkg::MSB+1:0] o1 = {man,{fp16Pkg::EMSB+1{1'b0}},1'b0} >> shamt;	// keep an extra bit for rounding
+wire [fp16Pkg::MSB:0] o2 = o1[fp16Pkg::MSB+1:1] + o1[0];		// round up
+reg [fp16Pkg::MSB:0] o3;
 
 always_ff @(posedge clk)
 	if (ce) begin

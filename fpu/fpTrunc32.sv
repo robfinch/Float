@@ -54,17 +54,17 @@ FP32 maxInt;
 assign maxInt.sign = 1'b0;
 assign maxInt.exp = 8'hFE;
 assign maxInt.sig = 23'h7FFFFF;			// maximum unsigned integer value
-wire [EMSB:0] zeroXp = {EMSB{1'b1}};	// simple constant - value of exp for zero
+wire [fp32Pkg::EMSB:0] zeroXp = {fp32Pkg::EMSB{1'b1}};	// simple constant - value of exp for zero
 
 // Decompose fp value
 reg sgn;									// sign
-reg [EMSB:0] exp;
-reg [FMSB:0] man;
-reg [FMSB:0] mask;
+reg [fp32Pkg::EMSB:0] exp;
+reg [fp32Pkg::FMSB:0] man;
+reg [fp32Pkg::FMSB:0] mask;
 
-wire [7:0] shamt = FMSB - (exp - zeroXp);
+wire [7:0] shamt = fp32Pkg::FMSB - (exp - zeroXp);
 always_comb
-for (n = 0; n <= FMSB; n = n +1)
+for (n = 0; n <= fp32Pkg::FMSB; n = n +1)
 	mask[n] = (n > shamt);
 
 always_comb
@@ -72,7 +72,7 @@ always_comb
 always_comb
 	exp = i.exp;
 always_comb
-	if (exp > zeroXp + FMSB)
+	if (exp > zeroXp + fp32Pkg::FMSB)
 		man = i.sig;
 	else
 		man = i.sig & mask;

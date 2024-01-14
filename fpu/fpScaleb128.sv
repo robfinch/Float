@@ -43,7 +43,7 @@ input clk;
 input ce;
 input FP128 a;
 input FP128 b;
-output reg FP128 o;
+output FP128 o;
 
 wire [4:0] cmp_o;
 wire nana, nanb;

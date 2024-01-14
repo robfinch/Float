@@ -45,7 +45,7 @@ module fpTrunc128(clk, ce, i, o, overflow);
 input clk;
 input ce;
 input FP128 i;
-output reg FP128 o;
+output FP128 o;
 output overflow;
 
 
@@ -54,17 +54,17 @@ FP128 maxInt;
 assign maxInt.sign = 1'b0;
 assign maxInt.exp = 15'h7FFE;
 assign maxInt.sig = 112'hFFFFFFFFFFFFFFFFFFFFFFFFFFF;// maximum unsigned integer value
-wire [EMSB:0] zeroXp = {EMSB{1'b1}};	// simple constant - value of exp for zero
+wire [fp128Pkg::EMSB:0] zeroXp = {fp128Pkg::EMSB{1'b1}};	// simple constant - value of exp for zero
 
 // Decompose fp value
 reg sgn;									// sign
-reg [EMSB:0] exp;
-reg [FMSB:0] man;
-reg [FMSB:0] mask;
+reg [fp128Pkg::EMSB:0] exp;
+reg [fp128Pkg::FMSB:0] man;
+reg [fp128Pkg::FMSB:0] mask;
 
-wire [14:0] shamt = FMSB - (exp - zeroXp);
+wire [14:0] shamt = fp128Pkg::FMSB - (exp - zeroXp);
 always_comb
-for (n = 0; n <= FMSB; n = n +1)
+for (n = 0; n <= fp128Pkg::FMSB; n = n +1)
 	mask[n] = (n > shamt);
 
 always_comb
@@ -72,7 +72,7 @@ always_comb
 always_comb
 	exp = i.exp;
 always_comb
-	if (exp > zeroXp + FMSB)
+	if (exp > zeroXp + fp128Pkg::FMSB)
 		man = i.sig;
 	else
 		man = i.sig & mask;

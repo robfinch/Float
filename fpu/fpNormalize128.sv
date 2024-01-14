@@ -282,7 +282,7 @@ always @(posedge clk)
 always @*
 begin
   St6 = 1'b0;
-  for (n = 0; n < FMSB+5; n = n + 1)
+  for (n = 0; n < fp128Pkg::FMSB+5; n = n + 1)
     if (n <= rshiftAmt6 + 1) St6 = St6|mo6[n];
 end
 always @(posedge clk)
@@ -304,7 +304,7 @@ ft_delay #(.WID(1),.DEP(1)) u84 (.clk(clk), .ce(ce), .i(rightOrLeft7), .o(under_
 always @(posedge clk)
 	if (ce) mo <= rightOrLeft7 ? mo7r|{St7,2'b0} : mo7l;
 
-assign o = {so,xo,mo[FMSB+5:2]};
+assign o = {so,xo,mo[fp128Pkg::FMSB+5:2]};
 
 endmodule
 	

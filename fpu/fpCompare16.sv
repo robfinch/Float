@@ -43,9 +43,10 @@ wire [fp16Pkg::FMSB:0] ma;
 wire [fp16Pkg::FMSB:0] mb;
 wire az, bz;
 wire nan_a, nan_b;
+wire infa, infb;
 
-fpDecomp16 u1(.i(a), .sgn(sa), .exp(xa), .man(ma), .vz(az), .qnan(), .snan(), .nan(nan_a) );
-fpDecomp16 u2(.i(b), .sgn(sb), .exp(xb), .man(mb), .vz(bz), .qnan(), .snan(), .nan(nan_b) );
+fpDecomp16 u1(.i(a), .sgn(sa), .exp(xa), .man(ma), .vz(az), .inf(infa), .qnan(), .snan(), .nan(nan_a) );
+fpDecomp16 u2(.i(b), .sgn(sb), .exp(xb), .man(mb), .vz(bz), .inf(infb), .qnan(), .snan(), .nan(nan_b) );
 
 wire unordered = nan_a | nan_b;
 

@@ -115,7 +115,7 @@ always_comb
 	 xo3 <= xo2 + (incExpByTwo2 ? 2'd2 : incExpByOne2 ? 2'd1 : 2'd0);
 
 always_comb
-	if(ce) zeroMan3 <= ((xv3b[fp128Pkg::EMSB+1]|| &xv3b[fp128Pkg::EMSB:0])||(xv3a[fp128Pkg::EMSB+1]| &xv3a[fp128Pkg::EMSB:0]))
+	zeroMan3 <= ((xv3b[fp128Pkg::EMSB+1]|| &xv3b[fp128Pkg::EMSB:0])||(xv3a[fp128Pkg::EMSB+1]| &xv3a[fp128Pkg::EMSB:0]))
 											 && !under2 && !xInf2c;
 
 // ----------------------------------------------------------------------------
@@ -130,7 +130,6 @@ reg [fp128Pkg::FMSB+5:0] mo4;
 reg inexact4;
 
 always_comb
-if(ce)
 casez({zeroMan3,incExpByTwo3,incExpByOne3})
 3'b1??:	mo4 <= 1'd0;
 3'b01?:	mo4 <= {i3[fp128Pkg::FX:fp128Pkg::FMSB],|i3[fp128Pkg::FMSB-1:0]};
@@ -139,7 +138,6 @@ default:	mo4 <= {i3[fp128Pkg::FX-2:fp128Pkg::FMSB-2],|i3[fp128Pkg::FMSB-3:0]};
 endcase
 
 always_comb
-if(ce)
 casez({zeroMan3,incExpByTwo3,incExpByOne3})
 3'b1??:	inexact4 <= 1'd0;
 3'b01?:	inexact4 <= |i3[fp128Pkg::FMSB+1:0];
@@ -282,7 +280,7 @@ always_comb
 always_comb
 begin
   St6 = 1'b0;
-  for (n = 0; n < FMSB+5; n = n + 1)
+  for (n = 0; n < fp128Pkg::FMSB+5; n = n + 1)
     if (n <= rshiftAmt6 + 1) St6 = St6|mo6[n];
 end
 always_comb
@@ -305,7 +303,7 @@ assign under_o = rightOrLeft7;
 always_comb
 	 mo <= rightOrLeft7 ? mo7r|{St7,2'b0} : mo7l;
 
-assign o = {so,xo,mo[FMSB+5:2]};
+assign o = {so,xo,mo[fp128Pkg::FMSB+5:2]};
 
 endmodule
 	

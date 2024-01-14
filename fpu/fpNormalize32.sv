@@ -257,13 +257,13 @@ wire zeroMan6;
 vtdl #(1) u61 (.clk(clk), .ce(ce), .a(4'd5), .d(under_i), .q(rightOrLeft6) );
 ft_delay #(.WID(fp32Pkg::EMSB+1),.DEP(1)) u62 (.clk(clk), .ce(ce), .i(xo5), .o(xo6));
 ft_delay #(.WID(fp32Pkg::FMSB+6),.DEP(2)) u63 (.clk(clk), .ce(ce), .i(mo4), .o(mo6) );
-ft_delay #(.WID(1),.DEP(1)) u32 (.clk(clk), .ce(ce), .i(xInf5), .o(xInf6) );
+ft_delay #(.WID(1),.DEP(1)) u64 (.clk(clk), .ce(ce), .i(xInf5), .o(xInf6) );
 ft_delay #(.WID(1),.DEP(3)) u65 (.clk(clk), .ce(ce),  .i(zeroMan3), .o(zeroMan6));
 
-always @(posedge clk)
+always_ff @(posedge clk)
 	if (ce) lshiftAmt6 <= leadingZeros5 > xo5 ? xo5 : leadingZeros5;
 
-always @(posedge clk)
+always_ff @(posedge clk)
 	if (ce) rshiftAmt6 <= xInf5 ? 1'd0 : $signed(xo5) > 1'd0 ? 1'd0 : ~xo5+2'd1;	// xo2 is negative !
 
 // ----------------------------------------------------------------------------
@@ -279,26 +279,26 @@ reg [fp32Pkg::FMSB+5:0] mo7l, mo7r;
 reg St6,St7;
 ft_delay #(.WID(1),.DEP(1)) u71 (.clk(clk), .ce(ce), .i(rightOrLeft6), .o(rightOrLeft7));
 
-always @(posedge clk)
+always_ff @(posedge clk)
 if (ce)
 	xo7 <= zeroMan6 ? xo6 :
 		xInf6 ? xo6 :					// an infinite exponent is either a NaN or infinity; no need to change
 		rightOrLeft6 ? 1'd0 :	// on a right shift, the exponent was negative, it's being made to zero
 		xo6 - lshiftAmt6;			// on a left shift, the exponent can't be decremented below zero
 
-always @(posedge clk)
+always_ff @(posedge clk)
 	if (ce) mo7r <= mo6 >> rshiftAmt6;
-always @(posedge clk)
+always_ff @(posedge clk)
 	if (ce) mo7l <= mo6 << lshiftAmt6;
 
 // The sticky bit is set if the bits shifted out on a right shift are set.
-always @*
+always_comb
 begin
   St6 = 1'b0;
-  for (n = 0; n < FMSB+5; n = n + 1)
+  for (n = 0; n < fp32Pkg::FMSB+5; n = n + 1)
     if (n <= rshiftAmt6 + 1) St6 = St6|mo6[n];
 end
-always @(posedge clk)
+always_ff @(posedge clk)
   if (ce) St7 <= St6;
 
 // ----------------------------------------------------------------------------
@@ -319,7 +319,7 @@ always @(posedge clk)
 
 assign o.sign = so;
 assign o.exp = xo;
-assign o.sig = mo[FMSB+5:2];
+assign o.sig = mo[fp32Pkg::FMSB+5:2];
 
 endmodule
 	

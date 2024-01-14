@@ -53,8 +53,8 @@ wire unordered = nan_a | nan_b;
 
 wire eq = !unordered & ((az & bz) || (a==b));	// special test for zero
 wire ne = !((az & bz) || (a==b));	// special test for zero
-wire gt1 = ({xa,ma} > {xb,mb}) | (infa & ~binf);
-wire lt1 = ({xa,ma} < {xb,mb}) | (infb & ~ainf);
+wire gt1 = ({xa,ma} > {xb,mb}) | (infa & ~infb);
+wire lt1 = ({xa,ma} < {xb,mb}) | (infb & ~infa);
 
 wire lt = sa ^ sb ? sa & !(az & bz): sa ? gt1 : lt1;
 
