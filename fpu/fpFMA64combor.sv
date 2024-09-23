@@ -5,9 +5,9 @@
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	fpFMA128Combo.sv
+//	fpFMA64combo.sv
 //		- floating point fused multiplier + adder
-//		- can issue every clock cycle
+//		- combinational logic only
 //		- IEEE 754 representation
 //
 //
@@ -39,25 +39,28 @@
 //                                                                          
 // ============================================================================
 
-import fp128Pkg::*;
+import fp64Pkg::*;
 
-module fpFMA128Combo (op, rm, a, b, c, o, under, over, inf, zero);
+module fpFMA64combo (rst, clk, op, rm, a, b, c, o, under, over, inf, zero);
+parameter LATENCY = 8;
+input rst;
+input clk;
 input op;		// operation 0 = add, 1 = subtract
 input [2:0] rm;
-input  FP128 a, b, c;
-output FP128X o;
+input  FP64 a, b, c;
+output FP64X o;
 output under;
 output over;
 output inf;
 output zero;
 
 // constants
-wire [fp128Pkg::EMSB:0] infXp = {fp128Pkg::EMSB+1{1'b1}};	// infinite / NaN - all ones
+wire [fp64Pkg::EMSB:0] infXp = {fp64Pkg::EMSB+1{1'b1}};	// infinite / NaN - all ones
 // The following is the value for an exponent of zero, with the offset
 // eg. 8'h7f for eight bit exponent, 11'h7ff for eleven bit exponent, etc.
-wire [fp128Pkg::EMSB:0] bias = {1'b0,{fp128Pkg::EMSB{1'b1}}};	//2^0 exponent
+wire [fp64Pkg::EMSB:0] bias = {1'b0,{fp64Pkg::EMSB{1'b1}}};	//2^0 exponent
 // The following is a template for a quiet nan. (MSB=1)
-wire [fp128Pkg::FMSB:0] qNaN  = {1'b1,{fp128Pkg::FMSB{1'b0}}};
+wire [fp64Pkg::FMSB:0] qNaN  = {1'b1,{fp64Pkg::FMSB{1'b0}}};
 
 // -----------------------------------------------------------
 // Clock #1
@@ -66,20 +69,20 @@ wire [fp128Pkg::FMSB:0] qNaN  = {1'b1,{fp128Pkg::FMSB{1'b0}}};
 // -----------------------------------------------------------
 
 wire sa1, sb1, sc1;			// sign bit
-wire [fp128Pkg::EMSB:0] xa1, xb1, xc1;	// exponent bits
-wire [fp128Pkg::FMSB+1:0] fracta1, fractb1, fractc1;	// includes unhidden bit
+wire [fp64Pkg::EMSB:0] xa1, xb1, xc1;	// exponent bits
+wire [fp64Pkg::FMSB+1:0] fracta1, fractb1, fractc1;	// includes unhidden bit
 wire a_dn1, b_dn1, c_dn1;			// a/b is denormalized
 wire aNan1, bNan1, cNan1;
 wire az1, bz1, cz1;
 wire aInf1, bInf1, cInf1;
 reg op1;
 
-fpDecomp128 u1a (.i(a), .sgn(sa1), .exp(xa1), .fract(fracta1), .xz(a_dn1), .vz(az1), .inf(aInf1), .nan(aNan1) );
-fpDecomp128 u1b (.i(b), .sgn(sb1), .exp(xb1), .fract(fractb1), .xz(b_dn1), .vz(bz1), .inf(bInf1), .nan(bNan1) );
-fpDecomp128 u1c (.i(c), .sgn(sc1), .exp(xc1), .fract(fractc1), .xz(c_dn1), .vz(cz1), .inf(cInf1), .nan(cNan1) );
+fpDecomp64 u1a (.i(a), .sgn(sa1), .exp(xa1), .fract(fracta1), .xz(a_dn1), .vz(az1), .inf(aInf1), .nan(aNan1) );
+fpDecomp64 u1b (.i(b), .sgn(sb1), .exp(xb1), .fract(fractb1), .xz(b_dn1), .vz(bz1), .inf(bInf1), .nan(bNan1) );
+fpDecomp64 u1c (.i(c), .sgn(sc1), .exp(xc1), .fract(fractc1), .xz(c_dn1), .vz(cz1), .inf(cInf1), .nan(cNan1) );
 
 always_comb
-	 op1 <= op;
+	op1 <= op;
 
 // -----------------------------------------------------------
 // Clock #2
@@ -91,19 +94,19 @@ always_comb
 // -----------------------------------------------------------
 
 reg abz2;
-reg [fp128Pkg::EMSB+2:0] ex2;
-reg [fp128Pkg::EMSB:0] xc2;
+reg [fp64Pkg::EMSB+2:0] ex2;
+reg [fp64Pkg::EMSB:0] xc2;
 reg realOp2;
 reg xcInf2;
 
 always_comb
-	 abz2 <= az1|bz1;
+	abz2 <= az1|bz1;
 always_comb
-	 ex2 <= (xa1|(a_dn1&~az1)) + (xb1|(b_dn1&~bz1)) - bias;
+	ex2 <= (xa1|(a_dn1&~az1)) + (xb1|(b_dn1&~bz1)) - bias;
 always_comb
-	 xc2 <= (xc1|(c_dn1&~cz1));
+	xc2 <= (xc1|c_dn1);
 always_comb
-	 xcInf2 = &xc1;
+	xcInf2 = &xc1;
 
 // Figure out which operation is really needed an add or
 // subtract ?
@@ -118,39 +121,38 @@ always_comb
 // -a -  b = add,-
 // -a - -b = sub, so of larger
 always_comb
-	 realOp2 <= op1 ^ (sa1 ^ sb1) ^ sc1;
+	realOp2 <= op1 ^ (sa1 ^ sb1) ^ sc1;
 
-
-reg [fp128Pkg::FX:0] fract5;
-wire [255:0] fractoo;
-mult128x128Combo umul1 (.a({15'd0,fracta1}), .b({15'd0,fractb1}), .o(fractoo));
+reg [fp64Pkg::FX:0] fract5;
+wire [127:0] fractoo;
+mult64x64combo umul1 (.a({11'd0,fracta1}), .b({11'd0,fractb1}), .o(fractoo));
 always_comb
-   fract5 <= fractoo[fp128Pkg::FX:0];
+  fract5 <= fractoo[fp64Pkg::FX:0];
 
 // -----------------------------------------------------------
 // Clock #3
 // Select zero exponent
 // -----------------------------------------------------------
 
-reg [fp128Pkg::EMSB+2:0] ex3;
-reg [fp128Pkg::EMSB:0] xc3;
+reg [fp64Pkg::EMSB+2:0] ex3;
+reg [fp64Pkg::EMSB:0] xc3;
 always_comb
-	 ex3 <= abz2 ? 1'd0 : ex2;
+	ex3 <= abz2 ? 1'd0 : ex2;
 always_comb
-	 xc3 <= xc2;
+	xc3 <= xc2;
 
 // -----------------------------------------------------------
 // Clock #4
 // Generate partial products.
 // -----------------------------------------------------------
 
-reg [fp128Pkg::EMSB+2:0] ex4;
-reg [fp128Pkg::EMSB:0] xc4;
+reg [fp64Pkg::EMSB+2:0] ex4;
+reg [fp64Pkg::EMSB:0] xc4;
 
 always_comb
-	 ex4 <= ex3;
+	ex4 <= ex3;
 always_comb
-	 xc4 <= xc3;
+	xc4 <= xc3;
 
 // -----------------------------------------------------------
 // Clock #5
@@ -161,31 +163,37 @@ always_comb
 // Status
 reg under5;
 reg over5;
-reg [fp128Pkg::EMSB+2:0] ex5;
-reg [fp128Pkg::EMSB:0] xc5;
-wire aInf5, bInf5;
-wire aNan5, bNan5;
-wire qNaNOut5;
+reg [fp64Pkg::EMSB+2:0] ex5;
+reg [fp64Pkg::EMSB:0] xc5;
+reg aInf5, bInf5;
+reg aNan5, bNan5;
+reg qNaNOut5;
 
 always_comb
-	 under5 <= ex4[fp128Pkg::EMSB+2];
+	under5 <= ex4[fp64Pkg::EMSB+2];
 always_comb
-	 over5 <= (&ex4[fp128Pkg::EMSB:0] | ex4[fp128Pkg::EMSB+1]) & !ex4[fp128Pkg::EMSB+2];
+	over5 <= (&ex4[fp64Pkg::EMSB:0] | ex4[fp64Pkg::EMSB+1]) & !ex4[fp64Pkg::EMSB+2];
 always_comb
-	 ex5 <= ex4;
+	ex5 <= ex4;
 always_comb
-	 xc5 <= xc4;
-
-assign aInf5 = aInf1;
-assign bInf5 = bInf1;
+	xc5 <= xc4;
+always_comb
+	aInf5 <= aInf1;
+always_comb
+	bInf5 <= bInf1;
 
 // determine when a NaN is output
-wire [fp128Pkg::MSB:0] a5,b5;
-assign qNaNOut5 = (aInf1&bz1)|(bInf1&az1);
-assign aNan5 = aNan1;
-assign bNan5 = bNan1;
-assign a5 = a;
-assign b5 = b;
+reg [fp64Pkg::MSB:0] a5,b5;
+always_comb
+	qNaNOut5 <= (aInf1&bz1)|(bInf1&az1);
+always_comb
+	aNan5 <= aNan1;
+always_comb
+	bNan5 <= bNan1;
+always_comb
+	a5 <= a;
+always_comb
+	b5 <= b;
 
 // -----------------------------------------------------------
 // Clock #6
@@ -194,39 +202,39 @@ assign b5 = b;
 // - correct xponent and mantissa for exceptional conditions
 // -----------------------------------------------------------
 
-reg [fp128Pkg::FX:0] mo6;
-reg [fp128Pkg::EMSB+2:0] ex6;
-reg [fp128Pkg::EMSB:0] xc6;
-wire [fp128Pkg::FMSB+1:0] fractc6;
-wire under6;
-assign fractc6 = fractc1;
-assign under6 = under5;
+reg [fp64Pkg::FX:0] mo6;
+reg [fp64Pkg::EMSB+2:0] ex6;
+reg [fp64Pkg::EMSB:0] xc6;
+reg [fp64Pkg::FMSB+1:0] fractc6;
+reg under6;
+always_comb
+	fractc6 <= fractc1;
+always_comb
+	under6 <= under5;
 
 always_comb
-	 xc6 <= xc5;
+	xc6 <= xc5;
 
 always_comb
-	
-		casez({aNan5,bNan5,qNaNOut5,aInf5,bInf5,over5})
-		6'b1?????:  mo6 <= {1'b1,1'b1,a5[fp128Pkg::FMSB-1:0],{fp128Pkg::FMSB+1{1'b0}}};
-    6'b01????:  mo6 <= {1'b1,1'b1,b5[fp128Pkg::FMSB-1:0],{fp128Pkg::FMSB+1{1'b0}}};
-		6'b001???:	mo6 <= {1'b1,qNaN|3'd4,{fp128Pkg::FMSB+1{1'b0}}};	// multiply inf * zero
-		6'b0001??:	mo6 <= 0;	// mul inf's
-		6'b00001?:	mo6 <= 0;	// mul inf's
-		6'b000001:	mo6 <= 0;	// mul overflow
-		default:	mo6 <= fract5;
-		endcase
+	casez({aNan5,bNan5,qNaNOut5,aInf5,bInf5,over5})
+	6'b1?????:  mo6 <= {1'b1,1'b1,a5[fp64Pkg::FMSB-1:0],{fp64Pkg::FMSB+1{1'b0}}};
+  6'b01????:  mo6 <= {1'b1,1'b1,b5[fp64Pkg::FMSB-1:0],{fp64Pkg::FMSB+1{1'b0}}};
+	6'b001???:	mo6 <= {1'b1,qNaN|3'd4,{fp64Pkg::FMSB+1{1'b0}}};	// multiply inf * zero
+	6'b0001??:	mo6 <= 0;	// mul inf's
+	6'b00001?:	mo6 <= 0;	// mul inf's
+	6'b000001:	mo6 <= 0;	// mul overflow
+	default:	mo6 <= fract5;
+	endcase
 
 always_comb
-	
-		casez({qNaNOut5|aNan5|bNan5,aInf5,bInf5,over5,under5})
-		5'b1????:	ex6 <= infXp;	// qNaN - infinity * zero
-		5'b01???:	ex6 <= infXp;	// 'a' infinite
-		5'b001??:	ex6 <= infXp;	// 'b' infinite
-		5'b0001?:	ex6 <= infXp;	// result overflow
-		5'b00001:	ex6 <= ex5;		//0;		// underflow
-		default:	ex6 <= ex5;		// situation normal
-		endcase
+	casez({qNaNOut5|aNan5|bNan5,aInf5,bInf5,over5,under5})
+	5'b1????:	ex6 <= infXp;	// qNaN - infinity * zero
+	5'b01???:	ex6 <= infXp;	// 'a' infinite
+	5'b001??:	ex6 <= infXp;	// 'b' infinite
+	5'b0001?:	ex6 <= infXp;	// result overflow
+	5'b00001:	ex6 <= ex5;		//0;		// underflow
+	default:	ex6 <= ex5;		// situation normal
+	endcase
 
 // -----------------------------------------------------------
 // Clock #7
@@ -236,22 +244,26 @@ reg ex_gt_xc7;
 reg xeq7;
 reg ma_gt_mc7;
 reg meq7;
-wire az7, bz7, cz7;
-wire realOp7;
+reg az7, bz7, cz7;
+reg realOp7;
 
 // which has greater magnitude ? Used for sign calc
 always_comb
-	 ex_gt_xc7 <= $signed(ex6) > $signed({2'b0,xc6});
+	ex_gt_xc7 <= $signed(ex6) > $signed({2'b0,xc6});
 always_comb
-	 xeq7 <= (ex6=={2'b0,xc6});
+	xeq7 <= (ex6=={2'b0,xc6});
 always_comb
-	 ma_gt_mc7 <= mo6 > {fractc6,{fp128Pkg::FMSB+1{1'b0}}};
+	ma_gt_mc7 <= mo6 > {fractc6,{fp64Pkg::FMSB+1{1'b0}}};
 always_comb
-	 meq7 <= mo6 == {fractc6,{fp128Pkg::FMSB+1{1'b0}}};
-assign az7 = az1;
-assign bz7 = bz1;
-assign cz7 = cz1;
-assign realOp7 = realOp2;
+	meq7 <= mo6 == {fractc6,{fp64Pkg::FMSB+1{1'b0}}};
+always_comb
+	az7 <= az1;
+always_comb
+	bz7 <= bz1;
+always_comb
+	cz7 <= cz1;
+always_comb
+	realOp7 <= realOp2;
 
 // -----------------------------------------------------------
 // Clock #8
@@ -262,31 +274,36 @@ assign realOp7 = realOp2;
 reg a_gt_b8;
 reg resZero8;
 reg ex_gt_xc8;
-wire [fp128Pkg::EMSB+2:0] ex8;
-wire [fp128Pkg::EMSB:0] xc8;
-wire xcInf8;
-wire [2:0] rm8;
-wire op8;
-wire sa8, sc8;
-
-assign ex8 = ex6;
-assign xc8 = xc6;
-assign xcInf8 = xcInf2;
-assign rm8 = rm;
-assign op8 = op1;
-assign sa8 = sa1 ^ sb1;
-assign sc8 = sc1;
+reg [fp64Pkg::EMSB+2:0] ex8;
+reg [fp64Pkg::EMSB:0] xc8;
+reg xcInf8;
+reg [2:0] rm8;
+reg op8;
+reg sa8, sc8;
 
 always_comb
-	 ex_gt_xc8 <= ex_gt_xc7;
+	ex8 <= ex6;
 always_comb
-	
-		a_gt_b8 <= ex_gt_xc7 || (xeq7 && ma_gt_mc7);
+	xc8 <= xc6;
+always_comb
+	xcInf8 <= xcInf2;
+always_comb
+	rm8 <= rm;	
+always_comb
+	op8 <= op1;
+always_comb
+	sa8 <= sa1 ^ sb1;
+always_comb
+	sc8 <= sc1;
+
+always_comb
+	ex_gt_xc8 <= ex_gt_xc7;
+always_comb
+	a_gt_b8 <= ex_gt_xc7 || (xeq7 && ma_gt_mc7);
 
 // Find out if the result will be zero.
 always_comb
-	
-		resZero8 <= (realOp7 & xeq7 & meq7) ||	// subtract, same magnitude
+	resZero8 <= (realOp7 & xeq7 & meq7) ||	// subtract, same magnitude
 			   ((az7 | bz7) & cz7);		// a or b zero and c zero
 
 // -----------------------------------------------------------
@@ -300,36 +317,38 @@ always_comb
 // -----------------------------------------------------------
 
 reg so9;
-reg [fp128Pkg::EMSB+2:0] ex9;
-reg [fp128Pkg::EMSB+2:0] ex9a;
+reg [fp64Pkg::EMSB+2:0] ex9;
+reg [fp64Pkg::EMSB+2:0] ex9a;
 reg ex_gt_xc9;
-reg [fp128Pkg::EMSB:0] xc9;
+reg [fp64Pkg::EMSB:0] xc9;
 reg a_gt_c9;
-wire [fp128Pkg::FX:0] mo9;
-wire [fp128Pkg::FMSB+1:0] fractc9;
-wire under9;
-wire xeq9;
+reg [fp64Pkg::FX:0] mo9;
+reg [fp64Pkg::FMSB+1:0] fractc9;
+reg under9;
+reg xeq9;
 
 always_comb
-	 ex_gt_xc9 <= ex_gt_xc8;
+	ex_gt_xc9 <= ex_gt_xc8;
 always_comb
-	 a_gt_c9 <= a_gt_b8;
+	a_gt_c9 <= a_gt_b8;
 always_comb
-	 xc9 <= xc8;
+	xc9 <= xc8;
 always_comb
-	 ex9a <= ex8;
+	ex9a <= ex8;
+always_comb
+	mo9 <= mo6;
+always_comb
+	fractc9 <= fractc6;
+always_comb
+	under9 <= under6;
+always_comb
+	xeq9 <= xeq7;	
 
-assign mo9 = mo6;
-assign fractc9 = fractc6;
-assign under9 = under6;
-assign xeq9 = xeq7;
-
 always_comb
-	 ex9 <= resZero8 ? 1'd0 : ex_gt_xc8 ? ex8 : {2'b0,xc8};
+	ex9 <= resZero8 ? 1'd0 : ex_gt_xc8 ? ex8 : {2'b0,xc8};
 
 // Compute output sign
 always_comb
-	
 	case ({resZero8,sa8,op8,sc8})	// synopsys full_case parallel_case
 	4'b0000: so9 <= 0;			// + + + = +
 	4'b0001: so9 <= !a_gt_b8;	// + + - = sign of larger
@@ -357,8 +376,8 @@ always_comb
 // is the same as an add. The underflow is tracked rather than
 // using extra bits in the exponent.
 // -----------------------------------------------------------
-reg [fp128Pkg::EMSB+2:0] xdiff10;
-reg [fp128Pkg::FX:0] mfs;
+reg [fp64Pkg::EMSB+2:0] xdiff10;
+reg [fp64Pkg::FX:0] mfs;
 reg ops10;
 
 // If the multiplier exponent was negative (underflowed) then
@@ -367,20 +386,20 @@ reg ops10;
 // amount underflows which is xc9 + -ex9a.
 
 always_comb
-	 xdiff10 <= ex_gt_xc9 ? ex9a - xc9
-										: ex9a[fp128Pkg::EMSB+2] ? xc9 + (~ex9a+2'd1)
+	xdiff10 <= ex_gt_xc9 ? ex9a - xc9
+										: ex9a[fp64Pkg::EMSB+2] ? xc9 + (~ex9a+2'd1)
 										: xc9 - ex9a;
 
 // Determine which fraction to denormalize (the one with the
 // smaller exponent is denormalized). If the exponents are equal
 // denormalize the smaller fraction.
 always_comb
-	 mfs <= 
-		xeq9 ? (a_gt_c9 ? {4'b0,fractc9,{fp128Pkg::FMSB+1{1'b0}}} : mo9)
-		 : ex_gt_xc9 ? {4'b0,fractc9,{fp128Pkg::FMSB+1{1'b0}}} : mo9;
+	mfs <= 
+		xeq9 ? (a_gt_c9 ? {4'b0,fractc9,{fp64Pkg::FMSB+1{1'b0}}} : mo9)
+		 : ex_gt_xc9 ? {4'b0,fractc9,{fp64Pkg::FMSB+1{1'b0}}} : mo9;
 
 always_comb
-	 ops10 <= xeq9 ? (a_gt_c9 ? 1'b1 : 1'b0)
+	ops10 <= xeq9 ? (a_gt_c9 ? 1'b1 : 1'b0)
 												: (ex_gt_xc9 ? 1'b1 : 1'b0);
 
 // -----------------------------------------------------------
@@ -390,18 +409,19 @@ always_comb
 reg [7:0] xdif11;
 
 always_comb
-	 xdif11 <= xdiff10 > fp128Pkg::FX+3 ? fp128Pkg::FX+3 : xdiff10;
+	xdif11 <= xdiff10 > fp64Pkg::FX+3 ? fp64Pkg::FX+3 : xdiff10;
 
 // -----------------------------------------------------------
 // Clock #12
 // Determine the sticky bit
 // -----------------------------------------------------------
 
-wire sticky, sticky12;
-wire [fp128Pkg::FX:0] mfs12;
-wire [7:0] xdif12;
+wire sticky;
+reg sticky12;
+reg [fp64Pkg::FX:0] mfs12;
+reg [7:0] xdif12;
 
-redorN #(.BSIZE(fp128Pkg::FX+1)) uredor1 (.a({1'b0,xdif11+fp128Pkg::FMSB}), .b(mfs), .o(sticky));
+redorN #(.BSIZE(fp64Pkg::FX+1)) uredor1 (.a({1'b0,xdif11+fp64Pkg::FMSB}), .b(mfs), .o(sticky));
 /*
 generate
 begin
@@ -413,10 +433,10 @@ else if (FPWID==84)
   redor84 u121 (.a(xdif11), .b({mfs,2'b0}), .o(sticky) );
 else if (FPWID==80)
   redor80 u121 (.a(xdif11), .b({mfs,2'b0}), .o(sticky) );
-else if (FPWID==128)
-  redor128 u121 (.a(xdif11), .b({mfs,2'b0}), .o(sticky) );
-else if (FPWID==128)
-  redor128 u121 (.a(xdif11), .b({mfs,2'b0}), .o(sticky) );
+else if (FPWID==64)
+  redor64 u121 (.a(xdif11), .b({mfs,2'b0}), .o(sticky) );
+else if (FPWID==64)
+  redor64 u121 (.a(xdif11), .b({mfs,2'b0}), .o(sticky) );
 else begin
 	always @* begin
   	$display("redor operation needed in fpFMA");
@@ -428,113 +448,156 @@ endgenerate
 */
 
 // register inputs to shifter and shift
-assign sticky12 = sticky;
-assign xdif12 = xdif11;
-assign mfs12 = mfs;
+always_comb
+	sticky12 <= sticky;
+always_comb
+	xdif12 <= xdif11;
+always_comb
+	mfs12 <= mfs;
 
 // -----------------------------------------------------------
 // Clock #13
 // - denormalize operand (shift right)
 // -----------------------------------------------------------
-reg [fp128Pkg::FX+2:0] mfs13;
-wire [fp128Pkg::FX:0] mo13;
-wire ex_gt_xc13;
-wire [fp128Pkg::FMSB+1:0] fractc13;
-wire ops13;
-
-assign mo13 = mo9;
-assign ex_gt_xc13 = ex_gt_xc9;
-assign fractc13 = fractc9;
-assign ops13 = ops10;
+reg [fp64Pkg::FX+2:0] mfs13;
+reg [fp64Pkg::FX:0] mo13;
+reg ex_gt_xc13;
+reg [fp64Pkg::FMSB+1:0] fractc13;
+reg ops13;
 
 always_comb
-	 mfs13 <= ({mfs12,2'b0} >> xdif12)|sticky12;
+	mo13 <= mo9;
+always_comb
+	ex_gt_xc13 <= ex_gt_xc9;
+always_comb
+	fractc13 <= fractc9;
+always_comb
+	ops13 <= ops10;
+
+always_comb
+	mfs13 <= ({mfs12,2'b0} >> xdif12)|sticky12;
 
 // -----------------------------------------------------------
 // Clock #14
 // Sort operands
 // -----------------------------------------------------------
-reg [fp128Pkg::FX+2:0] oa, ob;
-wire a_gt_b14;
-
-assign a_gt_b14 = a_gt_b8;
+reg [fp64Pkg::FX+2:0] oa, ob;
+reg a_gt_b14;
 
 always_comb
-	 oa <= ops13 ? {mo13,2'b00} : mfs13;
+	a_gt_b14 <= a_gt_b8;
+
 always_comb
-	 ob <= ops13 ? mfs13 : {fractc13,{fp128Pkg::FMSB+1{1'b0}},2'b00};
+	oa <= ops13 ? {mo13,2'b00} : mfs13;
+always_comb
+	ob <= ops13 ? mfs13 : {fractc13,{fp64Pkg::FMSB+1{1'b0}},2'b00};
 
 // -----------------------------------------------------------
 // Clock #15
 // - Sort operands
 // -----------------------------------------------------------
-reg [fp128Pkg::FX+2:0] oaa, obb;
-wire realOp15;
-wire [fp128Pkg::EMSB:0] ex15;
-wire [fp128Pkg::EMSB:0] ex9c = ex9[fp128Pkg::EMSB+1] ? infXp : ex9[fp128Pkg::EMSB:0];
-wire overflow15;
-assign realOp15 = realOp7;
-assign ex15 = ex9c;
-assign overflow15 = ex9[fp128Pkg::EMSB+1]| &ex9[fp128Pkg::EMSB:0];
+reg [fp64Pkg::FX+2:0] oaa, obb;
+reg realOp15;
+reg [fp64Pkg::EMSB:0] ex15;
+wire [fp64Pkg::EMSB:0] ex9c = ex9[fp64Pkg::EMSB+1] ? infXp : ex9[fp64Pkg::EMSB:0];
+reg overflow15;
 
 always_comb
-	 oaa <= a_gt_b14 ? oa : ob;
+	realOp15 <= realOp7;
 always_comb
-	 obb <= a_gt_b14 ? ob : oa;
+	ex15 <= ex9c;
+always_comb
+	overflow15 <= (ex9[fp64Pkg::EMSB+1]| &ex9[fp64Pkg::EMSB:0]) & ~ex9[fp64Pkg::EMSB+2];
+
+always_comb
+	oaa <= a_gt_b14 ? oa : ob;
+always_comb
+	obb <= a_gt_b14 ? ob : oa;
 
 // -----------------------------------------------------------
 // Clock #16
 // - perform add/subtract
 // - addition can generate an extra bit, subtract can't go negative
 // -----------------------------------------------------------
-reg [fp128Pkg::FX+3:0] mab;
-wire [fp128Pkg::FX:0] mo16;
-wire [fp128Pkg::FMSB+1:0] fractc16;
-wire Nan16;
-wire cNan16;
-wire aInf16, cInf16;
-wire op16;
-wire exinf16;
-
-assign Nan16 = qNaNOut5|aNan5|bNan5;
-assign cNan16 = cNan1;
-assign aInf16 = &ex6;
-assign cInf16 = cInf1;
-assign op16 = op1;
-assign mo16 = mo13;
-assign fractc16 = fractc9;
-assign exinf16 = &ex15;
+reg [fp64Pkg::FX+3:0] mab;
+reg [fp64Pkg::FX:0] mo16;
+reg [fp64Pkg::FMSB+1:0] fractc16;
+reg Nan16;
+reg cNan16;
+reg aInf16, cInf16;
+reg op16;
+reg exinf16;
 
 always_comb
-	 mab <= realOp15 ? oaa - obb : oaa + obb;
+	Nan16 <= qNaNOut5|aNan5|bNan5;
+always_comb
+	cNan16 <= cNan1;
+always_comb
+	aInf16 <= &ex6;
+always_comb
+	cInf16 <= cInf1;
+always_comb
+	op16 <= op1;
+always_comb
+	mo16 <= mo13;
+always_comb
+	fractc16 <= fractc9;
+always_comb
+	exinf16 <= &ex15;
+
+always_comb
+	mab <= realOp15 ? oaa - obb : oaa + obb;
 
 // -----------------------------------------------------------
 // Clock #17
 // - adjust for Nans
 // -----------------------------------------------------------
-wire [fp128Pkg::EMSB:0] ex17;
-reg [fp128Pkg::FX:0] mo17;
-wire so17;
-wire exinf17;
-wire overflow17;
+reg [fp64Pkg::EMSB:0] ex17;
+reg [fp64Pkg::FX:0] mo17;
+reg so17;
+reg exinf17;
+reg overflow17;
 
-assign so17 = so9;
-assign ex17 = ex15;
-assign exinf17 = exinf16;
-assign overflow17 = overflow15;
+always_comb
+	so17 <= so9;
+always_comb
+	ex17 <= ex15;
+always_comb
+	exinf17 <= exinf16;
+always_comb
+	overflow17 <= overflow15;
 
 always_comb
 	casez({aInf16&cInf16,Nan16,cNan16,exinf16})
-	4'b1???:	mo17 <= {1'b0,op16,{fp128Pkg::FMSB-1{1'b0}},op16,{fp128Pkg::FMSB{1'b0}}};	// inf +/- inf - generate QNaN on subtract, inf on add
+	4'b1???:	mo17 <= {1'b0,op16,{fp64Pkg::FMSB-1{1'b0}},op16,{fp64Pkg::FMSB{1'b0}}};	// inf +/- inf - generate QNaN on subtract, inf on add
 	4'b01??:	mo17 <= {1'b0,mo16};
-	4'b001?: 	mo17 <= {1'b1,1'b1,fractc16[fp128Pkg::FMSB-1:0],{fp128Pkg::FMSB+1{1'b0}}};
+	4'b001?: 	mo17 <= {1'b1,1'b1,fractc16[fp64Pkg::FMSB-1:0],{fp64Pkg::FMSB+1{1'b0}}};
 	4'b0001:	mo17 <= 1'd0;
-	default:	mo17 <= mab[fp128Pkg::FX+3:2];		// mab has two extra lead bits and two trailing bits
+	default:	mo17 <= mab[fp64Pkg::FX+3:2];		// mab has two extra lead bits and two trailing bits
 	endcase
 
-assign o.sign = so17;
-assign o.exp = ex17;
-assign o.sig = mo17;
+// -----------------------------------------------------------
+// -----------------------------------------------------------
+
+FP64X [LATENCY-1:0] regs;
+FP64X o1;
+
+assign o1.sign = so17;
+assign o1.exp = ex17;
+assign o1.sig = mo17;
+
+genvar g;
+generate begin : gRegs
+	always_ff @(posedge clk)
+		regs[LATENCY-1] <= o1;
+	for (g = 0; g < LATENCY-1; g = g + 1) begin
+		always_ff @(posedge clk)
+			regs[g] <= regs[g+1];
+	end
+end
+endgenerate
+
+assign o = regs[0];
 
 assign zero = {ex17,mo17}==1'd0;
 assign inf = exinf17;
@@ -546,26 +609,26 @@ endmodule
 
 // Multiplier with normalization and rounding.
 
-module fpFMA128nrCombo(op, rm, a, b, c, o, inf, zero, overflow, underflow, inexact);
+module fpFMA64nrCombo(op, rm, a, b, c, o, inf, zero, overflow, underflow, inexact);
 input op;
 input [2:0] rm;
-input  FP128 a, b, c;
-output FP128 o;
+input  FP64 a, b, c;
+output FP64 o;
 output zero;
 output inf;
-output overflow;
-output underflow;
-output inexact;
+output reg overflow;
+output reg underflow;
+output reg inexact;
 
-wire FP128X fma_o;
+wire FP64X fma_o;
 wire fma_underflow;
 wire fma_overflow;
 wire norm_underflow;
 wire norm_inexact;
 wire sign_exe1, inf1, overflow1, underflow1;
-wire FP128N fpn0;
+wire FP64N fpn0;
 
-fpFMA128Combo u1
+fpFMA64combo u1
 (
 	.op(op),
 	.rm(rm),
@@ -578,7 +641,7 @@ fpFMA128Combo u1
 	.zero(),
 	.inf()
 );
-fpNormalize128Combo u2
+fpNormalize64combo u2
 (
 	.i(fma_o),
 	.o(fpn0),
@@ -586,12 +649,16 @@ fpNormalize128Combo u2
 	.under_o(norm_underflow),
 	.inexact_o(norm_inexact)
 );
-fpRound128Combo u3(.rm(rm), .i(fpn0), .o(o) );
-fpDecomp128 u4(.i(o), .xz(), .vz(zero), .inf(inf));
-assign underflow = fma_underflow;
-assign overflow = fma_overflow;
-assign inexact = norm_inexact;
-assign overflow = inf;
+fpRound64combo u3(.rm(rm), .i(fpn0), .o(o) );
+fpDecomp64 u4(.i(o), .xz(), .vz(zero), .inf(inf));
+
+always_comb
+	underflow <= fma_underflow;
+always_comb
+	overflow <= fma_overflow;
+always_comb
+	inexact <= norm_inexact;
+//assign overflow = inf;
 
 endmodule
 

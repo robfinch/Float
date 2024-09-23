@@ -84,6 +84,7 @@ always_comb
 wire xInf2c, xInf2b;
 wire [fp128Pkg::EMSB:0] xo2;
 reg incExpByOne2, incExpByTwo2;
+wire under2;
 assign xInf2c = xInf1c;
 assign xInf2b = xInf1b;
 assign xo2 = xo0;

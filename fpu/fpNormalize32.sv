@@ -1,6 +1,6 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2006-2022  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2006-2024  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
@@ -98,6 +98,7 @@ always @(posedge clk)
 // ----------------------------------------------------------------------------
 wire xInf2c, xInf2b;
 wire [fp32Pkg::EMSB:0] xo2;
+wire under2;
 reg incExpByOne2, incExpByTwo2;
 ft_delay #(.WID(1),.DEP(1)) u21 (.clk(clk), .ce(ce), .i(xInf1c), .o(xInf2c));
 ft_delay #(.WID(1),.DEP(1)) u22 (.clk(clk), .ce(ce), .i(xInf1b), .o(xInf2b));

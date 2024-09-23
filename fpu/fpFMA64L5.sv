@@ -1,13 +1,14 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2019-2022  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2019-2024  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	fpFMA64.sv
+//	fpFMA64L5.sv
 //		- floating point fused multiplier + adder
 //		- can issue every clock cycle
+//		- latency of five
 //		- IEEE 754 representation
 //
 //
@@ -41,7 +42,7 @@
 
 import fp64Pkg::*;
 
-module fpFMA64 (clk, ce, op, rm, a, b, c, o, under, over, inf, zero);
+module fpFMA64L5 (clk, ce, op, rm, a, b, c, o, under, over, inf, zero);
 input clk;
 input ce;
 input op;		// operation 0 = add, 1 = subtract
@@ -65,6 +66,9 @@ wire [fp64Pkg::FMSB:0] qNaN  = {1'b1,{fp64Pkg::FMSB{1'b0}}};
 // Clock #1
 // - decode the input operands
 // - derive basic information
+// - the path from the inputs through the multiplier takes
+//   the most time and was slowing the fmax down below 50 MHz
+//   so, some regs are added here.
 // -----------------------------------------------------------
 
 wire sa1, sb1, sc1;			// sign bit
@@ -80,7 +84,7 @@ fpDecomp64Reg u1a (.clk(clk), .ce(ce), .i(a), .sgn(sa1), .exp(xa1), .fract(fract
 fpDecomp64Reg u1b (.clk(clk), .ce(ce), .i(b), .sgn(sb1), .exp(xb1), .fract(fractb1), .xz(b_dn1), .vz(bz1), .inf(bInf1), .nan(bNan1) );
 fpDecomp64Reg u1c (.clk(clk), .ce(ce), .i(c), .sgn(sc1), .exp(xc1), .fract(fractc1), .xz(c_dn1), .vz(cz1), .inf(cInf1), .nan(cNan1) );
 
-always @(posedge clk)
+always_ff @(posedge clk)
 	if (ce) op1 <= op;
 
 // -----------------------------------------------------------
@@ -97,15 +101,16 @@ reg [fp64Pkg::EMSB+2:0] ex2;
 reg [fp64Pkg::EMSB:0] xc2;
 reg realOp2;
 reg xcInf2;
+reg [fp64Pkg::FX:0] fract2;
 
-always @(posedge clk)
-	if (ce) abz2 <= az1|bz1;
-always @(posedge clk)
-	if (ce) ex2 <= (xa1|(a_dn1&~az1)) + (xb1|(b_dn1&~bz1)) - bias;
-always @(posedge clk)
-	if (ce) xc2 <= (xc1|c_dn1);
-always @(posedge clk)
-	if (ce) xcInf2 = &xc1;
+always_comb
+	abz2 <= az1|bz1;
+always_comb
+	ex2 <= (xa1|(a_dn1&~az1)) + (xb1|(b_dn1&~bz1)) - bias;
+always_comb
+	xc2 <= (xc1|(c_dn1&~cz1));
+always_comb
+	xcInf2 = &xc1;
 
 // Figure out which operation is really needed an add or
 // subtract ?
@@ -119,14 +124,18 @@ always @(posedge clk)
 //  a - -b = add,+
 // -a -  b = add,-
 // -a - -b = sub, so of larger
-always @(posedge clk)
-	if (ce) realOp2 <= op1 ^ (sa1 ^ sb1) ^ sc1;
+always_comb
+	realOp2 <= op1 ^ (sa1 ^ sb1) ^ sc1;
 
-reg [fp64Pkg::FX:0] fract5;
-wire [127:0] fractoo;
-mult64x64 umul1 (.clk(clk), .ce(ce), .a({11'd0,fracta1}), .b({11'd0,fractb1}), .o(fractoo));
-always @(posedge clk)
-  if (ce) fract5 <= fractoo[fp64Pkg::FX:0];
+reg [127:0] fractoo;
+mult64x64combo umul1 (
+	.a({14'd0,fracta1[fp64Pkg::FMSB+1:0]}),
+	.b({14'd0,fractb1[fp64Pkg::FMSB+1:0]}),
+	.o(fractoo)
+);
+
+always_comb
+  fract2 <= fractoo[fp64Pkg::FX:0];
 
 // -----------------------------------------------------------
 // Clock #3
@@ -135,10 +144,10 @@ always @(posedge clk)
 
 reg [fp64Pkg::EMSB+2:0] ex3;
 reg [fp64Pkg::EMSB:0] xc3;
-always @(posedge clk)
-	if (ce) ex3 <= abz2 ? 1'd0 : ex2;
-always @(posedge clk)
-	if (ce) xc3 <= xc2;
+always_comb
+	ex3 <= abz2 ? 1'd0 : ex2;
+always_comb
+	xc3 <= xc2;
 
 // -----------------------------------------------------------
 // Clock #4
@@ -148,10 +157,10 @@ always @(posedge clk)
 reg [fp64Pkg::EMSB+2:0] ex4;
 reg [fp64Pkg::EMSB:0] xc4;
 
-always @(posedge clk)
-	if (ce) ex4 <= ex3;
-always @(posedge clk)
-	if (ce) xc4 <= xc3;
+always_comb
+	ex4 <= ex3;
+always_comb
+	xc4 <= xc3;
 
 // -----------------------------------------------------------
 // Clock #5
@@ -164,29 +173,73 @@ reg under5;
 reg over5;
 reg [fp64Pkg::EMSB+2:0] ex5;
 reg [fp64Pkg::EMSB:0] xc5;
-wire aInf5, bInf5;
-wire aNan5, bNan5;
-wire qNaNOut5;
+reg aInf5, bInf5, cInf5;
+reg aNan5, bNan5;
+reg qNaNOut5;
+reg [fp64Pkg::FX:0] fract5;
+reg [fp64Pkg::FMSB+1:0] fractc5;	// includes unhidden bit
+reg az5, bz5, cz5, realOp5;
+reg xcInf5;
+reg [2:0] rm5;
+reg op5;
+reg sa5, sb5, sc5;
+reg cNan5;
 
-always @(posedge clk)
+always_ff @(posedge clk)
+	if (ce) cNan5 <= cNan1;
+always_ff @(posedge clk)
+	if (ce) rm5 <= rm;
+always_ff @(posedge clk)
+	if (ce) sa5 <= sa1;
+always_ff @(posedge clk)
+	if (ce) sb5 <= sb1;
+always_ff @(posedge clk)
+	if (ce) sc5 <= sc1;
+always_ff @(posedge clk)
+	if (ce) op5 <= op1;
+
+always_ff @(posedge clk)
 	if (ce) under5 <= ex4[fp64Pkg::EMSB+2];
-always @(posedge clk)
+always_ff @(posedge clk)
 	if (ce) over5 <= (&ex4[fp64Pkg::EMSB:0] | ex4[fp64Pkg::EMSB+1]) & !ex4[fp64Pkg::EMSB+2];
-always @(posedge clk)
+always_ff @(posedge clk)
 	if (ce) ex5 <= ex4;
-always @(posedge clk)
+always_ff @(posedge clk)
 	if (ce) xc5 <= xc4;
-
-delay4 u2a (.clk(clk), .ce(ce), .i(aInf1), .o(aInf5) );
-delay4 u2b (.clk(clk), .ce(ce), .i(bInf1), .o(bInf5) );
+always_ff @(posedge clk)
+	if (ce) fract5 <= fract2;
+always_ff @(posedge clk)
+	if (ce) aInf5 <= aInf1;
+always_ff @(posedge clk)
+	if (ce) bInf5 <= bInf1;
+always_ff @(posedge clk)
+	if (ce) cInf5 <= cInf1;
 
 // determine when a NaN is output
-wire [fp64Pkg::MSB:0] a5,b5;
-delay4 u5 (.clk(clk), .ce(ce), .i((aInf1&bz1)|(bInf1&az1)), .o(qNaNOut5) );
-delay4 u14 (.clk(clk), .ce(ce), .i(aNan1), .o(aNan5) );
-delay4 u15 (.clk(clk), .ce(ce), .i(bNan1), .o(bNan5) );
-delay5 #($bits(a)) u16 (.clk(clk), .ce(ce), .i(a), .o(a5) );
-delay5 #($bits(b)) u17 (.clk(clk), .ce(ce), .i(b), .o(b5) );
+reg [fp64Pkg::MSB:0] a5,b5;
+always_ff @(posedge clk)
+	if (ce) qNaNOut5 <= (aInf1&bz1)|(bInf1&az1);
+always_ff @(posedge clk)
+	if (ce) aNan5 <= aNan1;
+always_ff @(posedge clk)
+	if (ce) bNan5 <= bNan1;
+always_ff @(posedge clk)
+	if (ce) a5 <= a;
+always_ff @(posedge clk)
+	if (ce) b5 <= b;
+always_ff @(posedge clk)
+	if (ce) fractc5 <= fractc1;
+
+always_ff @(posedge clk)
+	if (ce) az5 <= az1;
+always_ff @(posedge clk)
+	if (ce) bz5 <= bz1;
+always_ff @(posedge clk)
+	if (ce) cz5 <= cz1;
+always_ff @(posedge clk)
+	if (ce) realOp5 <= realOp2;
+always_ff @(posedge clk)
+	if (ce) xcInf5 <= xcInf2;
 
 // -----------------------------------------------------------
 // Clock #6
@@ -198,35 +251,37 @@ delay5 #($bits(b)) u17 (.clk(clk), .ce(ce), .i(b), .o(b5) );
 reg [fp64Pkg::FX:0] mo6;
 reg [fp64Pkg::EMSB+2:0] ex6;
 reg [fp64Pkg::EMSB:0] xc6;
-wire [fp64Pkg::FMSB+1:0] fractc6;
-vtdl #(fp64Pkg::FMSB+2) u61 (.clk(clk), .ce(ce), .a(4'd4), .d(fractc1), .q(fractc6) );
-delay1 u62 (.clk(clk), .ce(ce), .i(under5), .o(under6));
+reg [fp64Pkg::FMSB+1:0] fractc6;
+reg under6;
 
-always @(posedge clk)
-	if (ce) xc6 <= xc5;
+always_comb
+	fractc6 <= fractc5;
+always_comb
+	under6 <= under5;
 
-always @(posedge clk)
-	if (ce)
-		casez({aNan5,bNan5,qNaNOut5,aInf5,bInf5,over5})
-		6'b1?????:  mo6 <= {1'b1,1'b1,a5[fp64Pkg::FMSB-1:0],{fp64Pkg::FMSB+1{1'b0}}};
-    6'b01????:  mo6 <= {1'b1,1'b1,b5[fp64Pkg::FMSB-1:0],{fp64Pkg::FMSB+1{1'b0}}};
-		6'b001???:	mo6 <= {1'b1,qNaN|3'd4,{fp64Pkg::FMSB+1{1'b0}}};	// multiply inf * zero
-		6'b0001??:	mo6 <= 0;	// mul inf's
-		6'b00001?:	mo6 <= 0;	// mul inf's
-		6'b000001:	mo6 <= 0;	// mul overflow
-		default:	mo6 <= fract5;
-		endcase
+always_comb
+	xc6 <= xc5;
 
-always @(posedge clk)
-	if (ce)
-		casez({qNaNOut5|aNan5|bNan5,aInf5,bInf5,over5,under5})
-		5'b1????:	ex6 <= infXp;	// qNaN - infinity * zero
-		5'b01???:	ex6 <= infXp;	// 'a' infinite
-		5'b001??:	ex6 <= infXp;	// 'b' infinite
-		5'b0001?:	ex6 <= infXp;	// result overflow
-		5'b00001:	ex6 <= ex5;		//0;		// underflow
-		default:	ex6 <= ex5;		// situation normal
-		endcase
+always_comb
+	casez({aNan5,bNan5,qNaNOut5,aInf5,bInf5,over5})
+	6'b1?????:  mo6 <= {1'b1,1'b1,a5[fp64Pkg::FMSB-1:0],{fp64Pkg::FMSB+1{1'b0}}};
+  6'b01????:  mo6 <= {1'b1,1'b1,b5[fp64Pkg::FMSB-1:0],{fp64Pkg::FMSB+1{1'b0}}};
+	6'b001???:	mo6 <= {1'b1,qNaN|3'd4,{fp64Pkg::FMSB+1{1'b0}}};	// multiply inf * zero
+	6'b0001??:	mo6 <= 0;	// mul inf's
+	6'b00001?:	mo6 <= 0;	// mul inf's
+	6'b000001:	mo6 <= 0;	// mul overflow
+	default:	mo6 <= fract5;
+	endcase
+
+always_comb
+	casez({qNaNOut5|aNan5|bNan5,aInf5,bInf5,over5,under5})
+	5'b1????:	ex6 <= infXp;	// qNaN - infinity * zero
+	5'b01???:	ex6 <= infXp;	// 'a' infinite
+	5'b001??:	ex6 <= infXp;	// 'b' infinite
+	5'b0001?:	ex6 <= infXp;	// result overflow
+	5'b00001:	ex6 <= ex5;		//0;		// underflow
+	default:	ex6 <= ex5;		// situation normal
+	endcase
 
 // -----------------------------------------------------------
 // Clock #7
@@ -236,23 +291,30 @@ reg ex_gt_xc7;
 reg xeq7;
 reg ma_gt_mc7;
 reg meq7;
-wire az7, bz7, cz7;
-wire realOp7;
+reg az7, bz7, cz7;
+reg realOp7;
+reg aInf7;
 
 // which has greater magnitude ? Used for sign calc
-always @(posedge clk)
-	if (ce) ex_gt_xc7 <= $signed(ex6) > $signed({2'b0,xc6});
-always @(posedge clk)
-	if (ce) xeq7 <= (ex6=={2'b0,xc6});
-always @(posedge clk)
-	if (ce) ma_gt_mc7 <= mo6 > {fractc6,{fp64Pkg::FMSB+1{1'b0}}};
-always @(posedge clk)
-	if (ce) meq7 <= mo6 == {fractc6,{fp64Pkg::FMSB+1{1'b0}}};
-vtdl #(1) u71 (.clk(clk), .ce(ce), .a(4'd5), .d(az1), .q(az7));
-vtdl #(1) u72 (.clk(clk), .ce(ce), .a(4'd5), .d(bz1), .q(bz7));
-vtdl #(1) u73 (.clk(clk), .ce(ce), .a(4'd5), .d(cz1), .q(cz7));
-vtdl #(1) u74 (.clk(clk), .ce(ce), .a(4'd4), .d(realOp2), .q(realOp7));
-
+always_comb
+	ex_gt_xc7 <= $signed(ex6) > $signed({2'b0,xc6});
+always_comb
+	xeq7 <= (ex6=={2'b0,xc6});
+always_comb
+	ma_gt_mc7 <= mo6 > {fractc6,{fp64Pkg::FMSB+1{1'b0}}};
+always_comb
+	meq7 <= mo6 == {fractc6,{fp64Pkg::FMSB+1{1'b0}}};
+always_comb
+	az7 <= az5;
+always_comb
+	bz7 <= bz5;
+always_comb
+	cz7 <= cz5;
+always_comb
+	realOp7 <= realOp5;
+always_comb
+	aInf7 <= &ex6;
+	
 // -----------------------------------------------------------
 // Clock #8
 // - prep for addition, determine greater operand
@@ -262,31 +324,36 @@ vtdl #(1) u74 (.clk(clk), .ce(ce), .a(4'd4), .d(realOp2), .q(realOp7));
 reg a_gt_b8;
 reg resZero8;
 reg ex_gt_xc8;
-wire [fp64Pkg::EMSB+2:0] ex8;
-wire [fp64Pkg::EMSB:0] xc8;
-wire xcInf8;
-wire [2:0] rm8;
-wire op8;
-wire sa8, sc8;
+reg [fp64Pkg::EMSB+2:0] ex8;
+reg [fp64Pkg::EMSB:0] xc8;
+reg xcInf8;
+reg [2:0] rm8;
+reg op8;
+reg sa8, sc8;
 
-delay2 #(fp64Pkg::EMSB+3) u81 (.clk(clk), .ce(ce), .i(ex6), .o(ex8));
-delay2 #(fp64Pkg::EMSB+1) u82 (.clk(clk), .ce(ce), .i(xc6), .o(xc8));
-vtdl #(1) u83 (.clk(clk), .ce(ce), .a(4'd5), .d(xcInf2), .q(xcInf8));
-vtdl #(3) u84 (.clk(clk), .ce(ce), .a(4'd7), .d(rm), .q(rm8));
-vtdl #(1) u85 (.clk(clk), .ce(ce), .a(4'd6), .d(op1), .q(op8));
-vtdl #(1) u86 (.clk(clk), .ce(ce), .a(4'd6), .d(sa1 ^ sb1), .q(sa8));
-vtdl #(1) u87 (.clk(clk), .ce(ce), .a(4'd6), .d(sc1), .q(sc8));
+always_comb
+	ex8 <= ex6;
+always_comb
+	xc8 <= xc6;
+always_comb
+	xcInf8 <= xcInf5;
+always_comb
+	rm8 <= rm5;
+always_comb
+	op8 <= op5;
+always_comb
+	sa8 <= sa5 ^ sb5;
+always_comb
+	sc8 <= sc5;
 
-always @(posedge clk)
-	if (ce) ex_gt_xc8 <= ex_gt_xc7;
-always @(posedge clk)
-	if (ce)
-		a_gt_b8 <= ex_gt_xc7 || (xeq7 && ma_gt_mc7);
+always_comb
+	ex_gt_xc8 <= ex_gt_xc7;
+always_comb
+	a_gt_b8 <= ex_gt_xc7 || (xeq7 && ma_gt_mc7);
 
 // Find out if the result will be zero.
-always @(posedge clk)
-	if (ce)
-		resZero8 <= (realOp7 & xeq7 & meq7) ||	// subtract, same magnitude
+always_comb
+	resZero8 <= (realOp7 & xeq7 & meq7) ||	// subtract, same magnitude
 			   ((az7 | bz7) & cz7);		// a or b zero and c zero
 
 // -----------------------------------------------------------
@@ -304,50 +371,70 @@ reg [fp64Pkg::EMSB+2:0] ex9;
 reg [fp64Pkg::EMSB+2:0] ex9a;
 reg ex_gt_xc9;
 reg [fp64Pkg::EMSB:0] xc9;
-reg a_gt_c9;
-wire [fp64Pkg::FX:0] mo9;
-wire [fp64Pkg::FMSB+1:0] fractc9;
-wire under9;
-wire xeq9;
+reg a_gt_b9;
+reg [fp64Pkg::FX:0] mo9;
+reg [fp64Pkg::FMSB+1:0] fractc9;
+reg under9;
+reg xeq9;
+reg realOp9;
+reg Nan9;
+reg cNan9;
+reg aInf9,cInf9;
+reg op9;
 
-always @(posedge clk)
+always_ff @(posedge clk)
+	if (ce) op9 <= op5;
+always_ff @(posedge clk)
+	if (ce) aInf9 <= aInf7;
+always_ff @(posedge clk)
+	if (ce) cInf9 <= cInf5;
+always_ff @(posedge clk)
+	if (ce) cNan9 <= cNan5;
+always_ff @(posedge clk)
+	if (ce) Nan9 <= qNaNOut5|aNan5|bNan5;
+always_ff @(posedge clk)
+	if (ce) realOp9 <= realOp7;
+always_ff @(posedge clk)
 	if (ce) ex_gt_xc9 <= ex_gt_xc8;
-always @(posedge clk)
-	if (ce) a_gt_c9 <= a_gt_b8;
-always @(posedge clk)
+always_ff @(posedge clk)
+	if (ce) a_gt_b9 <= a_gt_b8;
+always_ff @(posedge clk)
 	if (ce) xc9 <= xc8;
-always @(posedge clk)
+always_ff @(posedge clk)
 	if (ce) ex9a <= ex8;
+always_ff @(posedge clk)
+	if (ce) mo9 <= mo6;
+always_ff @(posedge clk)
+	if (ce) fractc9 <= fractc6;
+always_ff @(posedge clk)
+	if (ce) under9 <= under6;
+always_ff @(posedge clk)
+	if (ce) xeq9 <= xeq7;
 
-delay3 #(fp64Pkg::FX+1) u93 (.clk(clk), .ce(ce), .i(mo6), .o(mo9));
-delay3 #(fp64Pkg::FMSB+2) u94 (.clk(clk), .ce(ce), .i(fractc6), .o(fractc9));
-delay3 u95 (.clk(clk), .ce(ce), .i(under6), .o(under9));
-delay2 u96 (.clk(clk), .ce(ce), .i(xeq7), .o(xeq9));
-
-always @(posedge clk)
+always_ff @(posedge clk)
 	if (ce) ex9 <= resZero8 ? 1'd0 : ex_gt_xc8 ? ex8 : {2'b0,xc8};
 
 // Compute output sign
-always @(posedge clk)
+always_ff @(posedge clk)
 	if (ce)
-	case ({resZero8,sa8,op8,sc8})	// synopsys full_case parallel_case
-	4'b0000: so9 <= 0;			// + + + = +
-	4'b0001: so9 <= !a_gt_b8;	// + + - = sign of larger
-	4'b0010: so9 <= !a_gt_b8;	// + - + = sign of larger
-	4'b0011: so9 <= 0;			// + - - = +
-	4'b0100: so9 <= a_gt_b8;		// - + + = sign of larger
-	4'b0101: so9 <= 1;			// - + - = -
-	4'b0110: so9 <= 1;			// - - + = -
-	4'b0111: so9 <= a_gt_b8;		// - - - = sign of larger
-	4'b1000: so9 <= 0;			//  A +  B, sign = +
-	4'b1001: so9 <= rm8==3;		//  A + -B, sign = + unless rounding down
-	4'b1010: so9 <= rm8==3;		//  A -  B, sign = + unless rounding down
-	4'b1011: so9 <= 0;			// +A - -B, sign = +
-	4'b1100: so9 <= rm8==3;		// -A +  B, sign = + unless rounding down
-	4'b1101: so9 <= 1;			// -A + -B, sign = -
-	4'b1110: so9 <= 1;			// -A - +B, sign = -
-	4'b1111: so9 <= rm8==3;		// -A - -B, sign = + unless rounding down
-	endcase
+		case ({resZero8,sa8,op8,sc8})	// synopsys full_case parallel_case
+		4'b0000: so9 <= 0;			// + + + = +
+		4'b0001: so9 <= !a_gt_b8;	// + + - = sign of larger
+		4'b0010: so9 <= !a_gt_b8;	// + - + = sign of larger
+		4'b0011: so9 <= 0;			// + - - = +
+		4'b0100: so9 <= a_gt_b8;		// - + + = sign of larger
+		4'b0101: so9 <= 1;			// - + - = -
+		4'b0110: so9 <= 1;			// - - + = -
+		4'b0111: so9 <= a_gt_b8;		// - - - = sign of larger
+		4'b1000: so9 <= 0;			//  A +  B, sign = +
+		4'b1001: so9 <= rm8==3;		//  A + -B, sign = + unless rounding down
+		4'b1010: so9 <= rm8==3;		//  A -  B, sign = + unless rounding down
+		4'b1011: so9 <= 0;			// +A - -B, sign = +
+		4'b1100: so9 <= rm8==3;		// -A +  B, sign = + unless rounding down
+		4'b1101: so9 <= 1;			// -A + -B, sign = -
+		4'b1110: so9 <= 1;			// -A - +B, sign = -
+		4'b1111: so9 <= rm8==3;		// -A - -B, sign = + unless rounding down
+		endcase
 
 // -----------------------------------------------------------
 // Clock #10
@@ -366,22 +453,22 @@ reg ops10;
 // the exponent is zero. The total shift would be xc9-0-
 // amount underflows which is xc9 + -ex9a.
 
-always @(posedge clk)
-	if (ce) xdiff10 <= ex_gt_xc9 ? ex9a - xc9
+always_comb
+	xdiff10 <= ex_gt_xc9 ? ex9a - xc9
 										: ex9a[fp64Pkg::EMSB+2] ? xc9 + (~ex9a+2'd1)
 										: xc9 - ex9a;
 
 // Determine which fraction to denormalize (the one with the
 // smaller exponent is denormalized). If the exponents are equal
 // denormalize the smaller fraction.
-always @(posedge clk)
-	if (ce) mfs <= 
-		xeq9 ? (a_gt_c9 ? {4'b0,fractc9,{fp64Pkg::FMSB+1{1'b0}}} : mo9)
+always_comb
+	mfs <= 
+		xeq9 ? (a_gt_b9 ? {4'b0,fractc9,{fp64Pkg::FMSB+1{1'b0}}} : mo9)
 		 : ex_gt_xc9 ? {4'b0,fractc9,{fp64Pkg::FMSB+1{1'b0}}} : mo9;
 
-always @(posedge clk)
-	if (ce) ops10 <= xeq9 ? (a_gt_c9 ? 1'b1 : 1'b0)
-												: (ex_gt_xc9 ? 1'b1 : 1'b0);
+always_comb
+	ops10 <= xeq9 ? (a_gt_b9 ? 1'b1 : 1'b0)
+								: (ex_gt_xc9 ? 1'b1 : 1'b0);
 
 // -----------------------------------------------------------
 // Clock #11
@@ -389,24 +476,25 @@ always @(posedge clk)
 // -----------------------------------------------------------
 reg [7:0] xdif11;
 
-always @(posedge clk)
-	if (ce) xdif11 <= xdiff10 > fp64Pkg::FX+3 ? fp64Pkg::FX+3 : xdiff10;
+always_comb
+	xdif11 <= xdiff10 > fp64Pkg::FX+3 ? fp64Pkg::FX+3 : xdiff10;
 
 // -----------------------------------------------------------
 // Clock #12
 // Determine the sticky bit
 // -----------------------------------------------------------
 
-wire sticky, sticky12;
-wire [fp64Pkg::FX:0] mfs12;
-wire [7:0] xdif12;
+wire sticky;
+reg sticky12;
+reg [fp64Pkg::FX:0] mfs12;
+reg [7:0] xdif12;
 
 redorN #(.BSIZE(fp64Pkg::FX+1)) uredor1 (.a({1'b0,xdif11+fp64Pkg::FMSB}), .b(mfs), .o(sticky));
 /*
 generate
 begin
-if (FPWID==128)
-  redor128 u121 (.a(xdif11), .b({mfs,2'b0}), .o(sticky) );
+if (FPWID==64)
+  redor64 u121 (.a(xdif11), .b({mfs,2'b0}), .o(sticky) );
 else if (FPWID==96)
   redor96 u121 (.a(xdif11), .b({mfs,2'b0}), .o(sticky) );
 else if (FPWID==84)
@@ -415,8 +503,8 @@ else if (FPWID==80)
   redor80 u121 (.a(xdif11), .b({mfs,2'b0}), .o(sticky) );
 else if (FPWID==64)
   redor64 u121 (.a(xdif11), .b({mfs,2'b0}), .o(sticky) );
-else if (FPWID==64)
-  redor64 u121 (.a(xdif11), .b({mfs,2'b0}), .o(sticky) );
+else if (FPWID==32)
+  redor32 u121 (.a(xdif11), .b({mfs,2'b0}), .o(sticky) );
 else begin
 	always @* begin
   	$display("redor operation needed in fpFMA");
@@ -428,59 +516,94 @@ endgenerate
 */
 
 // register inputs to shifter and shift
-delay1 #(1)    u122(.clk(clk), .ce(ce), .i(sticky), .o(sticky12) );
-delay1 #(8)    u123(.clk(clk), .ce(ce), .i(xdif11),   .o(xdif12) );
-delay2 #(fp64Pkg::FX+1) u124(.clk(clk), .ce(ce), .i(mfs), .o(mfs12) );
+always_comb
+	sticky12 <= sticky;
+always_comb
+	xdif12 <= xdif11;
+always_comb
+	mfs12 <= mfs;
 
 // -----------------------------------------------------------
 // Clock #13
 // - denormalize operand (shift right)
 // -----------------------------------------------------------
 reg [fp64Pkg::FX+2:0] mfs13;
-wire [fp64Pkg::FX:0] mo13;
-wire ex_gt_xc13;
-wire [fp64Pkg::FMSB+1:0] fractc13;
-wire ops13;
+reg [fp64Pkg::FX:0] mo13;
+reg ex_gt_xc13;
+reg [fp64Pkg::FMSB+1:0] fractc13;
+reg ops13;
+reg a_gt_b13;
+reg realOp13;
+reg [fp64Pkg::EMSB+2:0] ex13;
+reg Nan13, cNan13;
+reg aInf13,cInf13;
+reg op13;
+reg so13;
 
-delay4 #(fp64Pkg::FX+1) u131 (.clk(clk), .ce(ce), .i(mo9), .o(mo13));
-delay4 u132 (.clk(clk), .ce(ce), .i(ex_gt_xc9), .o(ex_gt_xc13));
-vtdl #(fp64Pkg::FMSB+2) u133 (.clk(clk), .ce(ce), .a(4'd3), .d(fractc9), .q(fractc13));
-delay3 u134 (.clk(clk), .ce(ce), .i(ops10), .o(ops13));
+always_ff @(posedge clk)
+	if (ce) so13 <= so9;
+always_ff @(posedge clk)
+	if (ce) op13 <= op9;
+always_ff @(posedge clk)
+	if (ce) aInf13 <= aInf9;
+always_ff @(posedge clk)
+	if (ce) cInf13 <= cInf9;
+always_ff @(posedge clk)
+	if (ce) Nan13 <= Nan9;
+always_ff @(posedge clk)
+	if (ce) cNan13 <= cNan9;
+always_ff @(posedge clk)
+	if (ce) mo13 <= mo9;
+always_ff @(posedge clk)
+	if (ce) ex_gt_xc13 <= ex_gt_xc9;
+always_ff @(posedge clk)
+	if (ce) fractc13 <= fractc9;
+always_ff @(posedge clk)
+	if (ce) ops13 <= ops10;	
 
-always @(posedge clk)
+always_ff @(posedge clk)
 	if (ce) mfs13 <= ({mfs12,2'b0} >> xdif12)|sticky12;
+always_ff @(posedge clk)
+	if (ce) a_gt_b13 <= a_gt_b9;
+always_ff @(posedge clk)
+	if (ce) realOp13 <= realOp9;
+always_ff @(posedge clk)
+	if (ce) ex13 <= ex9;
 
 // -----------------------------------------------------------
 // Clock #14
 // Sort operands
 // -----------------------------------------------------------
 reg [fp64Pkg::FX+2:0] oa, ob;
-wire a_gt_b14;
+reg a_gt_b14;
 
-vtdl #(1) u141 (.clk(clk), .ce(ce), .a(4'd5), .d(a_gt_b8), .q(a_gt_b14));
+always_comb
+	a_gt_b14 <= a_gt_b13;
 
-always @(posedge clk)
-	if (ce) oa <= ops13 ? {mo13,2'b00} : mfs13;
-always @(posedge clk)
-	if (ce) ob <= ops13 ? mfs13 : {fractc13,{fp64Pkg::FMSB+1{1'b0}},2'b00};
+always_comb
+	oa <= ops13 ? {mo13,2'b00} : mfs13;
+always_comb
+	ob <= ops13 ? mfs13 : {fractc13,{fp64Pkg::FMSB+1{1'b0}},2'b00};
 
 // -----------------------------------------------------------
 // Clock #15
 // - Sort operands
 // -----------------------------------------------------------
 reg [fp64Pkg::FX+2:0] oaa, obb;
-wire realOp15;
-wire [fp64Pkg::EMSB:0] ex15;
-wire [fp64Pkg::EMSB:0] ex9c = ex9[fp64Pkg::EMSB+1] ? infXp : ex9[fp64Pkg::EMSB:0];
-wire overflow15;
-vtdl #(1) u151 (.clk(clk), .ce(ce), .a(4'd7), .d(realOp7), .q(realOp15));
-vtdl #(fp64Pkg::EMSB+1) u152 (.clk(clk), .ce(ce), .a(4'd5), .d(ex9c), .q(ex15));
-vtdl #(fp64Pkg::EMSB+1) u153 (.clk(clk), .ce(ce), .a(4'd5), .d(ex9[fp64Pkg::EMSB+1]| &ex9[fp64Pkg::EMSB:0]), .q(overflow15));
-
-always @(posedge clk)
-	if (ce) oaa <= a_gt_b14 ? oa : ob;
-always @(posedge clk)
-	if (ce) obb <= a_gt_b14 ? ob : oa;
+reg realOp15;
+reg [fp64Pkg::EMSB:0] ex15;
+wire [fp64Pkg::EMSB:0] ex13c = ex13[fp64Pkg::EMSB+1] ? infXp : ex13[fp64Pkg::EMSB:0];
+reg overflow15;
+always_comb
+	realOp15 <= realOp13;
+always_comb
+	ex15 <= ex13c;
+always_comb
+	overflow15 <= (ex13[fp64Pkg::EMSB+1]| &ex13[fp64Pkg::EMSB:0]) & ~ex13[fp64Pkg::EMSB+2];
+always_comb
+	oaa <= a_gt_b14 ? oa : ob;
+always_comb
+	obb <= a_gt_b14 ? ob : oa;
 
 // -----------------------------------------------------------
 // Clock #16
@@ -488,42 +611,54 @@ always @(posedge clk)
 // - addition can generate an extra bit, subtract can't go negative
 // -----------------------------------------------------------
 reg [fp64Pkg::FX+3:0] mab;
-wire [fp64Pkg::FX:0] mo16;
-wire [fp64Pkg::FMSB+1:0] fractc16;
-wire Nan16;
-wire cNan16;
-wire aInf16, cInf16;
-wire op16;
-wire exinf16;
+reg [fp64Pkg::FX:0] mo16;
+reg [fp64Pkg::FMSB+1:0] fractc16;
+reg Nan16;
+reg cNan16;
+reg aInf16, cInf16;
+reg op16;
+reg exinf16;
 
-vtdl #(1) u161 (.clk(clk), .ce(ce), .a(4'd10), .d(qNaNOut5|aNan5|bNan5), .q(Nan16));
-vtdl #(1) u162 (.clk(clk), .ce(ce), .a(4'd14), .d(cNan1), .q(cNan16));
-vtdl #(1) u163 (.clk(clk), .ce(ce), .a(4'd9), .d(&ex6), .q(aInf16));
-vtdl #(1) u164 (.clk(clk), .ce(ce), .a(4'd14), .d(cInf1), .q(cInf16));
-vtdl #(1) u165 (.clk(clk), .ce(ce), .a(4'd14), .d(op1), .q(op16));
-delay3 #(fp64Pkg::FX+1) u166 (.clk(clk), .ce(ce), .i(mo13), .o(mo16));
-vtdl #(fp64Pkg::FMSB+2) u167 (.clk(clk), .ce(ce), .a(4'd6), .d(fractc9), .q(fractc16));
-delay1 u169 (.clk(clk), .ce(ce), .i(&ex15), .o(exinf16));
+always_comb
+	Nan16 <= Nan13;
+always_comb
+	cNan16 <= cNan13;
+always_comb
+	aInf16 <= aInf13;
+always_comb
+	cInf16 <= cInf13;
+always_comb
+	op16 <= op13;
+always_comb
+	mo16 <= mo13;
+always_comb
+	fractc16 <= fractc13;
+always_comb
+	exinf16 <= &ex15;
 
-always @(posedge clk)
-	if (ce) mab <= realOp15 ? oaa - obb : oaa + obb;
+always_comb
+	mab <= realOp15 ? oaa - obb : oaa + obb;
 
 // -----------------------------------------------------------
 // Clock #17
 // - adjust for Nans
 // -----------------------------------------------------------
-wire [fp64Pkg::EMSB:0] ex17;
+reg [fp64Pkg::EMSB:0] ex17;
 reg [fp64Pkg::FX:0] mo17;
-wire so17;
-wire exinf17;
-wire overflow17;
-
-vtdl #(1)        u171 (.clk(clk), .ce(ce), .a(4'd7), .d(so9), .q(so17));
-delay2 #(fp64Pkg::EMSB+1) u172 (.clk(clk), .ce(ce), .i(ex15), .o(ex17));
-delay1 #(1) u173 (.clk(clk), .ce(ce), .i(exinf16), .o(exinf17));
-delay2 u174 (.clk(clk), .ce(ce), .i(overflow15), .o(overflow17));
+reg so17;
+reg exinf17;
+reg overflow17;
+always_ff @(posedge clk)
+	if (ce) so17 <= so13;
+always_ff @(posedge clk)
+	if (ce) ex17 <= ex15;
+always_ff @(posedge clk)
+	if (ce) exinf17 <= exinf16;
+always_ff @(posedge clk)
+	if (ce) overflow17 <= overflow15;
 
 always @(posedge clk)
+if (ce)
 	casez({aInf16&cInf16,Nan16,cNan16,exinf16})
 	4'b1???:	mo17 <= {1'b0,op16,{fp64Pkg::FMSB-1{1'b0}},op16,{fp64Pkg::FMSB{1'b0}}};	// inf +/- inf - generate QNaN on subtract, inf on add
 	4'b01??:	mo17 <= {1'b0,mo16};
@@ -546,7 +681,7 @@ endmodule
 
 // Multiplier with normalization and rounding.
 
-module fpFMA64nr(clk, ce, op, rm, a, b, c, o, inf, zero, overflow, underflow, inexact);
+module fpFMA64nrL8(clk, ce, op, rm, a, b, c, o, inf, zero, overflow, underflow, inexact);
 input clk;
 input ce;
 input op;
@@ -566,8 +701,9 @@ wire norm_underflow;
 wire norm_inexact;
 wire sign_exe1, inf1, overflow1, underflow1;
 wire FP64N fpn0;
+wire [2:0] rm6;
 
-fpFMA64 u1
+fpFMA64L5 u1
 (
 	.clk(clk),
 	.ce(ce),
@@ -582,7 +718,7 @@ fpFMA64 u1
 	.zero(),
 	.inf()
 );
-fpNormalize64 u2
+fpNormalize64L2 u2
 (
 	.clk(clk),
 	.ce(ce),
@@ -592,11 +728,12 @@ fpNormalize64 u2
 	.under_o(norm_underflow),
 	.inexact_o(norm_inexact)
 );
-fpRound64 u3(.clk(clk), .ce(ce), .rm(rm), .i(fpn0), .o(o) );
+delay6 #(3)			u8 (.clk(clk), .ce(ce), .i(rm), .o(rm6));
+fpRound64L1 u3(.clk(clk), .ce(ce), .rm(rm6), .i(fpn0), .o(o) );
 fpDecomp64 u4(.i(o), .xz(), .vz(zero), .inf(inf));
-vtdl						u5 (.clk(clk), .ce(ce), .a(4'd11), .d(fma_underflow), .q(underflow));
-vtdl						u6 (.clk(clk), .ce(ce), .a(4'd11), .d(fma_overflow), .q(overflow));
-delay3		#(1)	u7 (.clk(clk), .ce(ce), .i(norm_inexact), .o(inexact));
+vtdl #(.WID(1)) u5 (.clk(clk), .ce(ce), .a(4'd3), .d(fma_underflow), .q(underflow));
+vtdl #(.WID(1)) u6 (.clk(clk), .ce(ce), .a(4'd3), .d(fma_overflow), .q(overflow));
+delay1		#(1)	u7 (.clk(clk), .ce(ce), .i(norm_inexact), .o(inexact));
 assign overflow = inf;
 
 endmodule
