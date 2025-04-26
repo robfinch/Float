@@ -199,6 +199,7 @@ reg [fp64Pkg::FX:0] mo6;
 reg [fp64Pkg::EMSB+2:0] ex6;
 reg [fp64Pkg::EMSB:0] xc6;
 wire [fp64Pkg::FMSB+1:0] fractc6;
+wire under6;
 vtdl #(fp64Pkg::FMSB+2) u61 (.clk(clk), .ce(ce), .a(4'd4), .d(fractc1), .q(fractc6) );
 delay1 u62 (.clk(clk), .ce(ce), .i(under5), .o(under6));
 
