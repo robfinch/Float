@@ -10,7 +10,7 @@
 //  - parameterized width
 //  - IEEE 754 representation
 //  - pipelineable
-//  - single cycle latency
+//  - two cycle latency
 //
 // This source file is free software: you can redistribute it and/or modify 
 // it under the terms of the GNU Lesser General Public License as published 
@@ -82,8 +82,11 @@ always_comb
 // round the result
 wire [fp64Pkg::FMSB:0] mo = simag[fp64Pkg::MSB-1:fp64Pkg::EMSB+1]+rnd;
 
-assign o.sign = op & so;
-assign o.exp = xo;
-assign o.sig = mo;
+always_ff @(posedge clk)
+if (ce) begin
+	o.sign <= op & so;
+	o.exp <= xo;
+	o.sig <= mo;
+end
 
 endmodule

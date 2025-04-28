@@ -1,6 +1,6 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2019-2022  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2019-2025  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
@@ -8,6 +8,7 @@
 //	fpNextAfter64.v
 //		- floating point nextafter()
 //		- return next representable value
+//		- two cycle latency
 //
 // BSD 3-Clause License
 // Redistribution and use in source and binary forms, with or without
@@ -46,6 +47,7 @@ input FP64 a;
 input FP64 b;
 output reg FP64 o;
 
+FP64 o1;
 wire [4:0] cmp_o;
 wire nana, nanb;
 wire xza, mza;
@@ -59,38 +61,42 @@ wire [fp64Pkg::EMSB:0] infXp = {fp64Pkg::EMSB+1{1'b1}};
 
 always_ff  @(posedge clk)
 if (ce) begin
-	o <= a;
+	o1 <= a;
 	casez({a.sign,cmp_o})
-	6'b?1????:	o <= nana ? a : b;	// Unordered
-	6'b????1?:	o <= a;							// a,b Equal
+	6'b?1????:	o1 <= nana ? a : b;	// Unordered
+	6'b????1?:	o1 <= a;							// a,b Equal
 	6'b0????1:
 		if (ap1.exp==infXp) begin
-			o.sign <= a.sign;
-			o.exp <= a.exp;
-			o.sig <= {fp64Pkg::FMSB+1{1'b0}};
+			o1.sign <= a.sign;
+			o1.exp <= a.exp;
+			o1.sig <= {fp64Pkg::FMSB+1{1'b0}};
 		end
 		else
-			o <= ap1;
+			o1 <= ap1;
 	6'b0????0:
 		if (xza && mza)
 			;
 		else
-			o <= am1;
+			o1 <= am1;
 	6'b1????0:
 		if (ap1.exp==infXp) begin
-			o.sign <= a.sign;
-			o.exp <= a.exp;
-			o.sig <= {fp64Pkg::FMSB+1{1'b0}};
+			o1.sign <= a.sign;
+			o1.exp <= a.exp;
+			o1.sig <= {fp64Pkg::FMSB+1{1'b0}};
 		end
 		else
-			o <= ap1;
+			o1 <= ap1;
 	6'b1????1:
 		if (xza && mza)
 			;
 		else
-			o <= am1;
-	default:	o <= a;
+			o1 <= am1;
+	default:	o1 <= a;
 	endcase
 end
+
+always_ff  @(posedge clk)
+if (ce)
+	o <= o1;
 
 endmodule

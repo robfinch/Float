@@ -1,13 +1,14 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2019-2023  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2022-2025  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	fpTrunc64.sv
-//		- convert floating point to integer (chop off fractional bits)
-//		- single cycle latency floating point unit
+//	fpCvt64ToI64.sv
+//		- convert floating point to integer
+//		- two cycle latency floating point unit
+//		- parameterized width
 //		- IEEE 754 representation
 //
 //
@@ -41,55 +42,52 @@
 
 import fp64Pkg::*;
 
-module fpTrunc64(clk, ce, i, o);
+module fpCvt64ToI64(clk, ce, op, i, o, overflow);
 input clk;
 input ce;
-input FP64 i;
-output FP64 o;
+input op;					// 1 = signed, 0 = unsigned
+input [fp64Pkg::MSB:0] i;
+output reg [fp64Pkg::MSB:0] o;
+output overflow;
 
-
-integer n;
-FP64 o1;
-FP64 maxInt;
-assign maxInt.sign = 1'b0;
-assign maxInt.exp = 11'h7FE;
-assign maxInt.sig = 52'hFFFFFFFFFFFFF;// maximum unsigned integer value
+wire [fp64Pkg::MSB:0] maxInt  = op ? {fp64Pkg::MSB{1'b1}} : {fp64Pkg::FPWID{1'b1}};		// maximum integer value
 wire [fp64Pkg::EMSB:0] zeroXp = {fp64Pkg::EMSB{1'b1}};	// simple constant - value of exp for zero
 
 // Decompose fp value
 reg sgn;									// sign
-reg [fp64Pkg::EMSB:0] exp;
-reg [fp64Pkg::FMSB:0] man;
-reg [fp64Pkg::FMSB:0] mask;
+always_ff @(posedge clk)
+	if (ce) sgn = i[fp64Pkg::MSB];
+wire [fp64Pkg::EMSB:0] exp = i[fp64Pkg::MSB-1:fp64Pkg::FMSB+1];		// exponent
+wire [fp64Pkg::FMSB+1:0] man = {exp!=0,i[fp64Pkg::FMSB:0]};	// mantissa including recreate hidden bit
 
-wire [10:0] shamt = fp64Pkg::FMSB - (exp - zeroXp);
-always_comb
-for (n = 0; n <= fp64Pkg::FMSB; n = n +1)
-	mask[n] = (n > shamt);
+wire iz = i[fp64Pkg::MSB-1:0]==0;					// zero value (special)
 
-always_comb
-	sgn = i.sign;
-always_comb
-	exp = i.exp;
-always_comb
-	if (exp > zeroXp + fp64Pkg::FMSB)
-		man = i.sig;
-	else
-		man = i.sig & mask;
+assign overflow  = exp - zeroXp > (op ? fp64Pkg::MSB : fp64Pkg::FPWID);		// lots of numbers are too big - don't forget one less bit is available due to signed values
+wire underflow = exp < zeroXp - 1;			// value less than 1/2
+
+wire [7:0] shamt = (op ? fp64Pkg::MSB : fp64Pkg::FPWID) - (exp - zeroXp);	// exp - zeroXp will be <= MSB
+
+wire [fp64Pkg::MSB+1:0] o1 = {man,{fp64Pkg::EMSB+1{1'b0}},1'b0} >> shamt;	// keep an extra bit for rounding
+wire [fp64Pkg::MSB:0] o2 = o1[fp64Pkg::MSB+1:1] + o1[0];		// round up
+reg [fp64Pkg::MSB:0] o3;
 
 always_ff @(posedge clk)
 	if (ce) begin
-		if (exp < zeroXp)
-			o1 <= 64'd0;
-		else begin
-			o1.sign <= sgn;
-			o1.exp <= exp;
-			o1.sig <= man;
-		end
+		if (underflow|iz)
+			o3 <= 'd0;
+		else if (overflow)
+			o3 <= maxInt;
+		// value between 1/2 and 1 - round up
+		else if (exp==zeroXp-1)
+			o3 <= 64'd1;
+		// value > 1
+		else
+			o3 <= o2;
 	end
-
+		
 always_ff @(posedge clk)
 	if (ce)
-		o <= o1;
+		o <= (op & sgn) ? -o3 : o3;					// adjust output for correct signed value
 
 endmodule
+

@@ -62,7 +62,7 @@ input under_i;
 output reg under_o;
 output reg inexact_o;
 
-integer n;
+integer n,n1;
 // ----------------------------------------------------------------------------
 // No Clock required
 // ----------------------------------------------------------------------------
@@ -320,8 +320,8 @@ always_comb
 always_comb
 begin
   St6 = 1'b0;
-  for (n = 0; n < fp64Pkg::FMSB+5; n = n + 1)
-    if (n <= rshiftAmt6 + 1) St6 = St6|mo6[n];
+  for (n1 = 0; n1 < fp64Pkg::FMSB+5; n1 = n1 + 1)
+    if (n1 <= rshiftAmt6 + 1) St6 = St6|mo6[n1];
 end
 always_comb
   St7 <= St6;

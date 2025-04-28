@@ -1,6 +1,6 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2006-2023  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2006-2025  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
@@ -339,9 +339,12 @@ always_ff @(posedge clk)
 always_ff @(posedge clk)
 	if (ce) nan3 <= nan;
 		
-assign o.sign = sa3;
-assign o.exp = exp3[fp64Pkg::EMSB+1] ? 'd0 : exp3;
-assign o.sig = (exp3[fp64Pkg::EMSB+1] || exp3=='d0) ? {r1[20:-2],{fp64Pkg::FMSB-20{1'b0}}} : nan3 ? ma3 : {r1[20:-2],{fp64Pkg::FMSB-19{1'b0}}};
+always_ff @(posedge clk)
+	if (ce) begin
+		o.sign <= sa3;
+		o.exp <= exp3[fp64Pkg::EMSB+1] ? 'd0 : exp3;
+		o.sig <= (exp3[fp64Pkg::EMSB+1] || exp3=='d0) ? {r1[20:-2],{fp64Pkg::FMSB-20{1'b0}}} : nan3 ? ma3 : {r1[20:-2],{fp64Pkg::FMSB-19{1'b0}}};
+	end
 
 endmodule
 
