@@ -1,12 +1,12 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2022-2025  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2022  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	iTodf96_tb.sv
-//  - test convert integer to decimal floating point
+//	df128Toi_tb.sv
+//  - test convert decimal floating point to integer
 //
 // BSD 3-Clause License
 // Redistribution and use in source and binary forms, with or without
@@ -36,15 +36,16 @@
 //                                                                          
 // ============================================================================
 
-module i2df96_tb();
+module df96Toi_tb();
 
 reg rst;
 reg clk;
 reg [15:0] adr;
-wire [95:0] flt;
+reg [95:0] flt;
 reg [7:0] count;
 
-reg [95:0] bin;
+wire [95:0] bin;
+wire vf;
 
 integer outfile;
 
@@ -52,7 +53,7 @@ initial begin
 	rst = 1'b0;
 	clk = 1'b0;
 	adr = 0;
-	bin = $urandom(1);
+	flt = $urandom(1);
 	#20 rst = 1;
 	#50 rst = 0;
 	#10000000  $fclose(outfile);
@@ -67,7 +68,7 @@ generate begin : gRand
 	for (g = 0; g < 96; g = g + 4) begin
 		always @(posedge clk) begin
 			if (count==2)
-				bin[g+3:g] <= $urandom() % 16;
+				flt[g+3:g] <= $urandom() % 16;
 		end
 	end
 end
@@ -81,48 +82,42 @@ end
 else
 begin
   if (adr==0) begin
-    outfile = $fopen("c:/f/f/cores2024/float/dfpu/test_bench/i2df96_tvo.txt", "wb");
-    $fwrite(outfile, "s ------ bin ------  ------ flt ------  \n");
+    outfile = $fopen("c:/f/f/cores2024/rf6809/rtl/dfpu/test_bench/df96Toi_tvo.txt", "wb");
+    $fwrite(outfile, "s ------ flt ------  ------ bin ------  \n");
   end
 	count <= count + 1;
 	if (count > 140)
 		count <= 1'd1;
 	if (adr==1) begin
-		bin <= 96'h01;
+		flt <= 96'h25ff00000000000000000000;	// 1
 	end
 	if (adr==2) begin
-		bin <= 96'h0A;
+		flt <= 96'h260000000000000000000000;	// 10
 	end
 	if (adr==3) begin
-		bin <= 96'd100;
+		flt <= 96'h260100000000000000000000;	// 100
 	end
 	if (adr==4) begin
-		bin <= 96'd1000;
+		flt <= 96'h260200000000000000000000;	// 1000
 	end
 	if (adr==5) begin
-		bin <= 96'd1000000;
-	end
-	if (adr==6) begin
-		bin <= 96'd12345678;
-	end
-	if (adr==7) begin
-		bin <= 96'h02;
+		flt <= 96'h26064d2e7030000000000000;	// 12345678
 	end
 	if (count==140) begin
-  	$fwrite(outfile, "%c %h\t%h\n", adr[11] ? "s" : "u", bin, flt);
+  	$fwrite(outfile, "%c %h\t%h%c\n", adr[11] ? "s" : "u", flt, bin, vf ? "v": " ");
 		adr <= adr + 1;
 	end
 end
 
-i2df96 u6 (
+df96Toi u6 (
 	.rst(rst),
   .clk(clk),
   .ce(1'b1),
   .op(adr[11]),
-  .rm(3'd0),
   .ld(count==3),
-  .i(bin),
-  .o(flt),
+  .i(flt),
+  .o(bin),
+  .overflow(vf),
   .done()
 );
 
