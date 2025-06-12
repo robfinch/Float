@@ -43,7 +43,7 @@ input clk;
 input ce;
 input FP96 a;
 input FP96 b;
-output reg FP96 o;
+output FP96 o;
 
 wire [4:0] cmp_o;
 wire nana, nanb;

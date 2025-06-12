@@ -1,6 +1,6 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2019-2024  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2019-2025  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
@@ -734,7 +734,7 @@ fpDecomp64 u4(.i(o), .xz(), .vz(zero), .inf(inf));
 vtdl #(.WID(1)) u5 (.clk(clk), .ce(ce), .a(4'd3), .d(fma_underflow), .q(underflow));
 vtdl #(.WID(1)) u6 (.clk(clk), .ce(ce), .a(4'd3), .d(fma_overflow), .q(overflow));
 delay1		#(1)	u7 (.clk(clk), .ce(ce), .i(norm_inexact), .o(inexact));
-assign overflow = inf;
+//assign overflow = inf;
 
 endmodule
 

@@ -45,7 +45,7 @@ module fpTrunc96(clk, ce, i, o, overflow);
 input clk;
 input ce;
 input FP96 i;
-output reg FP96 o;
+output FP96 o;
 output overflow;
 
 
@@ -54,17 +54,17 @@ FP96 maxInt;
 assign maxInt.sign = 1'b0;
 assign maxInt.exp = 15'h7FFE;
 assign maxInt.sig = 80'hFFFFFFFFFFFFFFFFFFFF;// maximum unsigned integer value
-wire [EMSB:0] zeroXp = {EMSB{1'b1}};	// simple constant - value of exp for zero
+wire [fp96Pkg::EMSB:0] zeroXp = {fp96Pkg::EMSB{1'b1}};	// simple constant - value of exp for zero
 
 // Decompose fp value
 reg sgn;									// sign
-reg [EMSB:0] exp;
-reg [FMSB:0] man;
-reg [FMSB:0] mask;
+reg [fp96Pkg::EMSB:0] exp;
+reg [fp96Pkg::FMSB:0] man;
+reg [fp96Pkg::FMSB:0] mask;
 
-wire [14:0] shamt = FMSB - (exp - zeroXp);
+wire [14:0] shamt = fp96Pkg::FMSB - (exp - zeroXp);
 always_comb
-for (n = 0; n <= FMSB; n = n +1)
+for (n = 0; n <= fp96Pkg::FMSB; n = n +1)
 	mask[n] = (n > shamt);
 
 always_comb
@@ -72,7 +72,7 @@ always_comb
 always_comb
 	exp = i.exp;
 always_comb
-	if (exp > zeroXp + FMSB)
+	if (exp > zeroXp + fp96Pkg::FMSB)
 		man = i.sig;
 	else
 		man = i.sig & mask;

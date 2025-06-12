@@ -1,6 +1,6 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2022  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2022-2025  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
@@ -121,7 +121,7 @@ wire done3;
 `ifndef GOLDSCHMIDT
 fpdivr16 #(fp96Pkg::FMSB+FADD) u2 (.clk(clk), .ld(ld1), .a({3'b0,fracta,8'b0}), .b({3'b0,fractb,8'b0}), .q(divo), .r(), .done(done1), .lzcnt(lzcnt));
 //fpdivr2 #(FMSB+FADD) u2 (.clk4x(clk4x), .ld(ld), .a({3'b0,fracta,8'b0}), .b({3'b0,fractb,8'b0}), .q(divo), .r(), .done(done1), .lzcnt(lzcnt));
-wire [(fp96Pkg::FMSB+FADD)*2-1:0] divo1 = divo[(FMSB+FADD)*2-1:0] << (lzcnt-2);
+wire [(fp96Pkg::FMSB+FADD)*2-1:0] divo1 = divo[(fp96Pkg::FMSB+FADD)*2-1:0] << (lzcnt-2);
 `else
 DivGoldschmidt #(.WID(fp96Pkg::FMSB+6),.WHOLE(1),.POINTS(fp96Pkg::FMSB+5))
 	u2 (.rst(rst), .clk(clk), .ld(ld1), .a({fracta,4'b0}), .b({fractb,4'b0}), .q(divo), .done(done1), .lzcnt(lzcnt));
@@ -147,9 +147,9 @@ reg qNaNOut;
 
 always_ff @(posedge clk)
 `ifndef GOLDSCHMIDT
-  if (ce) ex1 <= (xa|(a_dn&~az)) - (xb|(b_dn&~bz)) + bias + FMSB + (FADD-1) - lzcnt - 8'd1;
+  if (ce) ex1 <= (xa|(a_dn&~az)) - (xb|(b_dn&~bz)) + bias + fp96Pkg::FMSB + (FADD-1) - lzcnt - 8'd1;
 `else
-  if (ce) ex1 <= (xa|(a_dn&~az)) - (xb|(b_dn&~bz)) + bias + FMSB - lzcnt + 8'd4;
+  if (ce) ex1 <= (xa|(a_dn&~az)) - (xb|(b_dn&~bz)) + bias + fp96Pkg::FMSB - lzcnt + 8'd4;
 `endif
 
 always_ff @(posedge clk)
@@ -209,8 +209,8 @@ else if (ce) begin
 		8'b0001????:	mo <= 1'd0;	// div by inf
 		8'b00001???:	mo <= 1'd0;	// div by zero
 		8'b000001??:	mo <= 1'd0;	// Inf exponent
-		8'b0000001?:	mo <= {1'b1,qNaN|QINFDIV,{fp96Pkg::FMSB+1{1'b0}}};	// infinity / infinity
-		8'b00000001:	mo <= {1'b1,qNaN|QZEROZERO,{fp96Pkg::FMSB+1{1'b0}}};	// zero / zero
+		8'b0000001?:	mo <= {1'b1,qNaN|fp96Pkg::QINFDIV,{fp96Pkg::FMSB+1{1'b0}}};	// infinity / infinity
+		8'b00000001:	mo <= {1'b1,qNaN|fp96Pkg::QZEROZERO,{fp96Pkg::FMSB+1{1'b0}}};	// zero / zero
 `ifndef GOLDSCHMIDT
 		default:		mo <= divo1[(fp96Pkg::FMSB+FADD)*2-1:(FADD-2)*2-2];	// plain div
 `else

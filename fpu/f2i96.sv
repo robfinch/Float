@@ -1,6 +1,6 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2022  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2022-2025  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
@@ -36,30 +36,30 @@ module f2i96(clk, ce, op, i, o, overflow);
 input clk;
 input ce;
 input op;					// 1 = signed, 0 = unsigned
-input [MSB:0] i;
-output [MSB:0] o;
+input [fp96Pkg::MSB:0] i;
+output [fp96Pkg::MSB:0] o;
 output overflow;
 
-wire [MSB:0] maxInt  = op ? {MSB{1'b1}} : {FPWID{1'b1}};		// maximum integer value
-wire [EMSB:0] zeroXp = {EMSB{1'b1}};	// simple constant - value of exp for zero
+wire [fp96Pkg::MSB:0] maxInt  = op ? {fp96Pkg::MSB{1'b1}} : {fp96Pkg::FPWID{1'b1}};		// maximum integer value
+wire [fp96Pkg::EMSB:0] zeroXp = {fp96Pkg::EMSB{1'b1}};	// simple constant - value of exp for zero
 
 // Decompose fp value
 reg sgn;									// sign
 always_ff @(posedge clk)
-	if (ce) sgn = i[MSB];
-wire [EMSB:0] exp = i[MSB-1:FMSB+1];		// exponent
-wire [FMSB+1:0] man = {exp!=0,i[FMSB:0]};	// mantissa including recreate hidden bit
+	if (ce) sgn = i[fp96Pkg::MSB];
+wire [fp96Pkg::EMSB:0] exp = i[fp96Pkg::MSB-1:fp96Pkg::FMSB+1];		// exponent
+wire [fp96Pkg::FMSB+1:0] man = {exp!=0,i[fp96Pkg::FMSB:0]};	// mantissa including recreate hidden bit
 
-wire iz = i[MSB-1:0]==0;					// zero value (special)
+wire iz = i[fp96Pkg::MSB-1:0]==0;					// zero value (special)
 
-assign overflow  = exp - zeroXp > (op ? MSB : FPWID);		// lots of numbers are too big - don't forget one less bit is available due to signed values
+assign overflow  = exp - zeroXp > (op ? fp96Pkg::MSB : fp96Pkg::FPWID);		// lots of numbers are too big - don't forget one less bit is available due to signed values
 wire underflow = exp < zeroXp - 1;			// value less than 1/2
 
-wire [7:0] shamt = (op ? MSB : FPWID) - (exp - zeroXp);	// exp - zeroXp will be <= MSB
+wire [7:0] shamt = (op ? fp96Pkg::MSB : fp96Pkg::FPWID) - (exp - zeroXp);	// exp - zeroXp will be <= MSB
 
-wire [MSB+1:0] o1 = {man,{EMSB+1{1'b0}},1'b0} >> shamt;	// keep an extra bit for rounding
-wire [MSB:0] o2 = o1[MSB+1:1] + o1[0];		// round up
-reg [MSB:0] o3;
+wire [fp96Pkg::MSB+1:0] o1 = {man,{fp96Pkg::EMSB+1{1'b0}},1'b0} >> shamt;	// keep an extra bit for rounding
+wire [fp96Pkg::MSB:0] o2 = o1[fp96Pkg::MSB+1:1] + o1[0];		// round up
+reg [fp96Pkg::MSB:0] o3;
 
 always_ff @(posedge clk)
 	if (ce) begin

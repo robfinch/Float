@@ -317,7 +317,7 @@ always_comb
 always_comb
 begin
   St6 = 1'b0;
-  for (n = 0; n < FMSB+5; n = n + 1)
+  for (n = 0; n < fp96Pkg::FMSB+5; n = n + 1)
     if (n <= rshiftAmt6 + 1) St6 = St6|mo6[n];
 end
 always_comb
@@ -345,7 +345,7 @@ always_ff @(posedge clk)
 
 assign o.sign = so;
 assign o.exp = xo;
-assign o.sig = mo[FMSB+5:2];
+assign o.sig = mo[fp96Pkg::FMSB+5:2];
 
 endmodule
 	
