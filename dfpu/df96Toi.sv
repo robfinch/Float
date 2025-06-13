@@ -1,6 +1,6 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2022  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2022-2025  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
@@ -46,7 +46,7 @@ input ld;
 input op;						// 1 = signed, 0 = unsigned
 input [95:0] i;		// float input
 output [95:0] o;		// integer output
-output overflow;
+output reg overflow;
 output done;
 
 wire done1;
@@ -63,33 +63,39 @@ wire [11:0] zeroXp = 12'h5FF;
 
 reg sgn;									// sign
 always_ff @(posedge clk)
-	if (ce) sgn = ui.sign;
+	sgn <= ui.sign;
 wire [11:0] exp = ui.exp;		// exponent
 
 wire iz = i[94:0]==0;			// zero value (special)
 
 wire [12:0] ovx = exp - zeroXp;
-assign overflow  = ovx > 23 && !ovx[12];	// lots of numbers are too big - don't forget one less bit is available due to signed values
-wire underflow = exp < zeroXp - 2'd1;			// value less than 1/2
+always_ff @(posedge clk)
+	overflow <= ovx > 23 && !ovx[12];	// lots of numbers are too big - don't forget one less bit is available due to signed values
+reg underflow;
+always_ff @(posedge clk)
+	underflow <= exp < zeroXp - 2'd1;	// value less than 1/2
 
 wire [7:0] shamt = 8'd128 - {(exp - zeroXp),2'd0};	// exp - zeroXp will be <= MSB
 
 wire [128:0] o1 = {ui.sig,33'b0} >> shamt;	// keep an extra bit for rounding
 wire [95:0] o2;		// round up
 reg [95:0] o3;
+reg rb;		// round bit
 
 DDBCDToBin #(.WID(96)) ub2b1
 (
 	.rst(rst),
 	.clk(clk),
 	.ld(ld),
-	.bcd({o1[128:1]+o1[0]}),
+	.bcd(o1[128:1]),
 	.bin(o2),
 	.done(done1)
 );
 
+always_ff @(posedge clk)
+	rb <= o1[0];
 
-always @(posedge clk)
+always_ff @(posedge clk)
 	if (ce) begin
 		if (underflow|iz)
 			o3 <='d0;
@@ -100,9 +106,9 @@ always @(posedge clk)
 			o3 <= 96'd1;
 		// value > 1
 		else
-			o3 <= o2;
+			o3 <= o2 + rb;
 	end
-always @(posedge clk)
+always_ff @(posedge clk)
 	if (ce) done2 <= done1;
 		
 assign o = (op & sgn) ? -o3 : o3;					// adjust output for correct signed value

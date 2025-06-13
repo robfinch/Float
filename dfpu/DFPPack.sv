@@ -1,6 +1,6 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2020-2021  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2020-2025 Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
@@ -123,6 +123,37 @@ begin
 		o.expc <= {1'b1,i.exp[6:0]};
 	else
 		o.expc <= i.exp[7:0];
+	// significand continuation
+	o.sigc <= enc_sig;
+end
+
+endmodule
+
+module DFPPack32(i, o);
+input DFP32U i;
+output DFP32 o;
+
+wire [19:0] enc_sig;
+DPDEncodeN #(.N(2)) u1 (i.sig[23:0], enc_sig);
+
+always_comb
+begin
+	// sign
+	o.sign <= i.sign;
+	// combo
+	if (i.qnan|i.snan)
+		o.combo <= 5'b11111;
+	else if (i.infinity)
+		o.combo <= 5'b11110;
+	else
+		o.combo <= i.sig[27:24] > 4'h7 ? {2'b11,i.exp[7:6],i.sig[24]} : {i.exp[7:6],i.sig[26:24]};
+	// exponent continuation
+	if (i.qnan)
+		o.expc <= {1'b0,i.exp[4:0]};
+	else if (i.snan)
+		o.expc <= {1'b1,i.exp[4:0]};
+	else
+		o.expc <= i.exp[5:0];
 	// significand continuation
 	o.sigc <= enc_sig;
 end

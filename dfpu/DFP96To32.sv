@@ -40,27 +40,36 @@
 
 import DFPPkg::*;
 
-module DFP32To96(i, o);
-input DFP32 i;
-output DFP96 o;
+module DFP96To32(i, o);
+input DFP96 i;
+output DFP32 o;
 
 wire [11:0] bias96 = 12'h5FF;
 wire [ 7:0] bias32 = 8'h5F;
 
-DFP32U iu;
-DFP96U ou;
+reg [12:0] texp;
+DFP32U ou;
+DFP96U iu;
 
-DFPUnpack32 u1 (i, iu);
+DFPUnpack96 u1 (i, iu);
 
 always_comb
 	ou.sign = iu.sign;
 always_comb
-	if (iu.infinity|iu.nan)
-		ou.exp = 12'hBFF;
-	else
-		ou.exp = bias96 + (iu.exp - bias32);
-always_comb
+begin
 	ou.infinity = iu.infinity;
+	if (iu.infinity|iu.nan)
+		ou.exp = 8'hBF;
+	else begin
+		texp = bias32 + (iu.exp - bias96);
+		if (texp > 13'hBF) begin
+			ou.exp = 13'hBF;
+			ou.infinity = 1'b1;
+		end
+		else
+			ou.exp = bias32 + (iu.exp - bias96);
+	end
+end
 always_comb
 	ou.nan = iu.nan;
 always_comb
@@ -68,8 +77,8 @@ always_comb
 always_comb
 	ou.snan = iu.snan;
 always_comb
-	ou.sig = {iu.sig,72'd0};
+	ou.sig = iu.sig[99:72];
 
-DFPPack96 u2 (ou, o);
+DFPPack32 u2 (ou, o);
 
 endmodule
