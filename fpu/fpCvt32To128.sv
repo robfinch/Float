@@ -1,7 +1,7 @@
 `timescale 1ns / 1ps
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2006-2022  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2006-2025  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
@@ -51,11 +51,13 @@ wire [ 7:0] bias32 = 8'h7F;
 always_comb
 	o.sign = i.sign;
 always_comb
-	if (i.exp==8'hFF)	// Keep infinity / nan status
+	if (i.exp==8'hFF)	begin // Keep infinity / nan status
 		o.exp = 15'h7FFF;
-	else
+		o.sig = {i.sig,85'd0,i.sig[3:0]};
+	end
+	else begin
 		o.exp = bias128 - bias32 + i.exp;
-always_comb
-	o.sig = {i.sig,90'd0};
+		o.sig = {i.sig,89'd0};
+	end
 
 endmodule

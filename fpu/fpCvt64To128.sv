@@ -1,12 +1,12 @@
 `timescale 1ns / 1ps
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2006-2022  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2006-2025  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	fpCvt32To96.sv
+//	fpCvt64To128.sv
 //    - decimal floating convert double to triple
 //
 //
@@ -51,11 +51,14 @@ wire [10:0] bias64 = 11'h3FF;
 always_comb
 	o.sign = i.sign;
 always_comb
-	if (i.exp==11'h7FF)	// Keep infinity / nan status
+	if (i.exp==11'h7FF)	begin // Keep infinity / nan status
 		o.exp = 15'h7FFF;
-	else
+		o.sig = {i.sig,56'd0,i.sig[3:0]};
+	end
+	else begin
 		o.exp = bias128 - bias64 + i.exp;
+		o.sig = {i.sig,60'd0};
+	end
 always_comb
-	o.sig = {i.sig,60'd0};
 
 endmodule

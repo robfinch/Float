@@ -51,11 +51,13 @@ wire [ 4:0] bias16 = 5'h0F;
 always_comb
 	o.sign = i.sign;
 always_comb
-	if (i.exp==5'h1F)	// Keep infinity / nan status
+	if (i.exp==5'h1F)	begin // Keep infinity / nan status
 		o.exp = 15'h7FFF;
-	else
+		o.sig = {i.sig,66'd0,i.sig[3:0]};
+	end
+	else begin
 		o.exp = bias96 - bias16 + i.exp;
-always_comb
-	o.sig = {i.sig,70'd0};
+		o.sig = {i.sig,70'd0};
+	end
 
 endmodule

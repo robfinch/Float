@@ -27,10 +27,11 @@
 
 import fp16Pkg::*;
 
-module fpCompare16(a, b, o, nan, snan);
+module fpCompare16(a, b, o, inf, nan, snan);
 input FP16 a, b;
 output [15:0] o;
 reg [15:0] o;
+output inf;
 output nan;
 output snan;
 
@@ -77,5 +78,6 @@ end
 //assign nanx = op!=`FCOR && op!=`FCUN && unordered;
 assign nan = nan_a|nan_b|(infa & infb);
 assign snan = (nan_a & ~ma[fp16Pkg::FMSB]) | (nan_b & ~mb[fp16Pkg::FMSB]);
+assign inf = infa & infb;
 
 endmodule
