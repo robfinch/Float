@@ -43,10 +43,11 @@
 
 import fp64Pkg::*;
 
-module fpFDP64L5 (clk, ce, op, rm, a, b, c, d, o, under, over, inf, zero);
+module fpFDP64L5 (clk, ce, adr, op, rm, a, b, c, d, o, under, over, inf, zero, nan_col);
 input clk;
 input ce;
-input op;		// operation 0 = add, 1 = subtract
+input [63:0] adr;	// address of FDP instruction
+input op;					// operation 0 = add, 1 = subtract
 input [2:0] rm;
 input  FP64 a, b, c, d;
 output FP64X o;
@@ -54,6 +55,9 @@ output under;
 output over;
 output inf;
 output zero;
+output nan_col;
+
+wire [63:0] bradr = fnBitRev64(adr);
 
 // constants
 wire [fp64Pkg::EMSB:0] infXp = {fp64Pkg::EMSB+1{1'b1}};	// infinite / NaN - all ones
@@ -269,6 +273,7 @@ always_ff @(posedge clk)
 reg [fp64Pkg::FX:0] moab6,mocd6;
 reg [fp64Pkg::EMSB+2:0] exab6,excd6;
 reg underab6,undercd6;
+reg nan_col6;
 
 always_comb
 	underab6 <= underab5;
@@ -279,7 +284,7 @@ always_comb
 	casez({aNan5,bNan5,qNaNOutab5,aInf5,bInf5,overab5})
 	6'b1?????:  moab6 <= {1'b1,1'b1,a5[fp64Pkg::FMSB-1:0],{fp64Pkg::FMSB+1{1'b0}}};
   6'b01????:  moab6 <= {1'b1,1'b1,b5[fp64Pkg::FMSB-1:0],{fp64Pkg::FMSB+1{1'b0}}};
-	6'b001???:	moab6 <= {1'b1,qNaN|3'd4,{fp64Pkg::FMSB+1{1'b0}}};	// multiply inf * zero
+	6'b001???:	moab6 <= {1'b1,qNaN|(64'd4 << (fp64Pkg::FMSB-4))|bradr[63:20],{fp64Pkg::FMSB+1{1'b0}}};	// multiply inf * zero
 	6'b0001??:	moab6 <= 0;	// mul inf's
 	6'b00001?:	moab6 <= 0;	// mul inf's
 	6'b000001:	moab6 <= 0;	// mul overflow
@@ -290,7 +295,7 @@ always_comb
 	casez({cNan5,dNan5,qNaNOutcd5,cInf5,dInf5,overcd5})
 	6'b1?????:  mocd6 <= {1'b1,1'b1,a5[fp64Pkg::FMSB-1:0],{fp64Pkg::FMSB+1{1'b0}}};
   6'b01????:  mocd6 <= {1'b1,1'b1,b5[fp64Pkg::FMSB-1:0],{fp64Pkg::FMSB+1{1'b0}}};
-	6'b001???:	mocd6 <= {1'b1,qNaN|3'd4,{fp64Pkg::FMSB+1{1'b0}}};	// multiply inf * zero
+	6'b001???:	mocd6 <= {1'b1,qNaN|(64'd4 << (fp64Pkg::FMSB-4))|bradr[63:20],{fp64Pkg::FMSB+1{1'b0}}};	// multiply inf * zero
 	6'b0001??:	mocd6 <= 0;	// mul inf's
 	6'b00001?:	mocd6 <= 0;	// mul inf's
 	6'b000001:	mocd6 <= 0;	// mul overflow
@@ -316,6 +321,9 @@ always_comb
 	5'b00001:	excd6 <= excd5;		//0;		// underflow
 	default:	excd6 <= excd5;		// situation normal
 	endcase
+
+always_comb
+	nan_col6 = (aNan5 & bNan5) | (cNan5 & dNan5);
 
 // -----------------------------------------------------------
 // Clock #7
@@ -413,6 +421,7 @@ reg Nanab9,Nancd9;
 reg abInf9,cdInf9;
 reg op9;
 reg resZero9;
+reg nan_col9;
 
 always_ff @(posedge clk)
 	if (ce) op9 <= op5;
@@ -450,6 +459,8 @@ always_ff @(posedge clk)
 	if (ce) resZero9 <= resZero8;
 always_ff @(posedge clk)
 	if (ce) ex9 <= resZero8 ? 1'd0 : exab_gt_excd8 ? exab8 : excd8;
+always_ff @(posedge clk)
+	if (ce) nan_col9 <= nan_col6;
 
 // Compute output sign
 always_ff @(posedge clk)
@@ -593,6 +604,7 @@ reg op13;
 reg so13;
 reg resZero13;
 reg xunderflow13;
+reg nan_col13;
 
 always_ff @(posedge clk)
 	if (ce) so13 <= so9;
@@ -629,6 +641,8 @@ always_ff @(posedge clk)
 	if (ce) resZero13 <= resZero9;
 always_ff @(posedge clk)
 	if (ce) xunderflow13 <= xab_underflow&xcd_underflow;
+always_ff @(posedge clk)
+	if (ce) nan_col13 <= nan_col9;
 
 // -----------------------------------------------------------
 // Clock #14
@@ -708,6 +722,7 @@ reg exinf17;
 reg overflow17;
 reg resZero17;
 reg xunderflow17;
+reg nan_col17;
 
 always_ff @(posedge clk)
 	if (ce) resZero17 <= resZero13;
@@ -721,11 +736,13 @@ always_ff @(posedge clk)
 	if (ce) overflow17 <= overflow15;
 always_ff @(posedge clk)
 	if (ce) xunderflow17 <= xunderflow13;
+always_ff @(posedge clk)
+	if (ce) nan_col17 <= nan_col13 | (Nanab16 & Nancd16);
 
 always @(posedge clk)
 if (ce)
 	casez({abInf16&cdInf16,Nanab16,Nancd16,exinf16,resZero13})
-	5'b1????:	mo17 <= {1'b0,op16,{fp64Pkg::FMSB-1{1'b0}},op16,{fp64Pkg::FMSB{1'b0}}};	// inf +/- inf - generate QNaN on subtract, inf on add
+	5'b1????:	mo17 <= {1'b0,op16,2'b00,op16,{fp64Pkg::FMSB-3{1'b0}}|(op16?bradr[63:20]:64'd0),{fp64Pkg::FMSB{1'b0}}};	// inf +/- inf - generate QNaN on subtract, inf on add
 	5'b01???:	mo17 <= {1'b0,moab16};
 	5'b001??:	mo17 <= {1'b0,mocd16};
 	5'b0001?:	mo17 <= 1'd0;
@@ -741,15 +758,17 @@ assign zero = {ex17,mo17}==1'd0;
 assign inf = exinf17;
 assign under = xunderflow17;//ex17==1'd0 && |mo17;
 assign over = overflow17;
+assign nan_col = nan_col17;
 
 endmodule
 
 
 // Multiplier with normalization and rounding.
 
-module fpFDP64nrL8(clk, ce, op, rm, a, b, c, d, o, inf, zero, overflow, underflow, inexact);
+module fpFDP64nrL8(clk, ce, adr, op, rm, a, b, c, d, o, inf, zero, overflow, underflow, inexact, nancol);
 input clk;
 input ce;
+input [63:0] adr;
 input op;
 input [2:0] rm;
 input  FP64 a, b, c, d;
@@ -759,10 +778,12 @@ output inf;
 output overflow;
 output underflow;
 output inexact;
+output nancol;		// NaN collision
 
 wire FP64X fdp_o;
 wire fdp_underflow;
 wire fdp_overflow;
+wire fdp_nan_col;
 wire norm_underflow;
 wire norm_inexact;
 wire sign_exe1, inf1, overflow1, underflow1;
@@ -773,6 +794,7 @@ fpFDP64L5 u1
 (
 	.clk(clk),
 	.ce(ce),
+	.adr(adr),
 	.op(op),
 	.rm(rm),
 	.a(a),
@@ -783,7 +805,8 @@ fpFDP64L5 u1
 	.under(fdp_underflow),
 	.over(fdp_overflow),
 	.zero(),
-	.inf()
+	.inf(),
+	.nan_col(fdp_nan_col)
 );
 fpNormalize64L2 u2
 (
@@ -795,12 +818,13 @@ fpNormalize64L2 u2
 	.under_o(norm_underflow),
 	.inexact_o(norm_inexact)
 );
-delay6 #(3)			u8 (.clk(clk), .ce(ce), .i(rm), .o(rm6));
+delay6 #(3)			u9 (.clk(clk), .ce(ce), .i(rm), .o(rm6));
 fpRound64L1 u3(.clk(clk), .ce(ce), .rm(rm6), .i(fpn0), .o(o) );
 fpDecomp64 u4(.i(o), .xz(), .vz(zero), .inf(inf));
 vtdl #(.WID(1)) u5 (.clk(clk), .ce(ce), .a(4'd3), .d(fdp_underflow), .q(underflow));
 vtdl #(.WID(1)) u6 (.clk(clk), .ce(ce), .a(4'd3), .d(fdp_overflow), .q(overflow));
-delay1		#(1)	u7 (.clk(clk), .ce(ce), .i(norm_inexact), .o(inexact));
+vtdl #(.WID(1)) u7 (.clk(clk), .ce(ce), .a(4'd3), .d(fdp_nan_col), .q(nan_col));
+delay1		#(1)	u8 (.clk(clk), .ce(ce), .i(norm_inexact), .o(inexact));
 //assign overflow = inf;
 
 endmodule

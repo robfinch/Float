@@ -1,6 +1,6 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2006-2022  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2006-2025  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
@@ -63,7 +63,7 @@ module fpMultiply32(clk, ce, a, b, o, sign_exe, inf, overflow, underflow);
 input clk;
 input ce;
 input  FP32 a, b;
-output [fp32Pkg::EX:0] o;
+output FP32X o;
 output sign_exe;
 output inf;
 output overflow;
@@ -74,12 +74,12 @@ reg [fp32Pkg::EMSB:0] xo1;		// extra bit for sign
 reg [fp32Pkg::FX:0] mo1;
 
 // constants
-wire [fp32Pkg::EMSB:0] infXp = {EMSB+1{1'b1}};	// infinite / NaN - all ones
+wire [fp32Pkg::EMSB:0] infXp = {fp32Pkg::EMSB+1{1'b1}};	// infinite / NaN - all ones
 // The following is the value for an exponent of zero, with the offset
 // eg. 8'h7f for eight bit exponent, 11'h7ff for eleven bit exponent, etc.
-wire [fp32Pkg::EMSB:0] bias = {1'b0,{EMSB{1'b1}}};	//2^0 exponent
+wire [fp32Pkg::EMSB:0] bias = {1'b0,{fp32Pkg::EMSB{1'b1}}};	//2^0 exponent
 // The following is a template for a quiet nan. (MSB=1)
-wire [fp32Pkg::FMSB:0] qNaN  = {1'b1,{FMSB{1'b0}}};
+wire [fp32Pkg::FMSB:0] qNaN  = {1'b1,{fp32Pkg::FMSB{1'b0}}};
 
 // variables
 reg [fp32Pkg::FX:0] fract1,fract1a;
@@ -167,7 +167,7 @@ always @(posedge clk)
 		endcase
 
 // Force mantissa to zero when underflow or zero exponent when not supporting denormals.
-always @(posedge clk)
+always_ff @(posedge clk)
 	if (ce)
 `ifdef SUPPORT_DENORMALS
 		casez({aNan1,bNan1,qNaNOut,aInf1,bInf1,over1})
@@ -176,7 +176,7 @@ always @(posedge clk)
 `endif
 		6'b1?????:  mo1 = {1'b1,a1[fp32Pkg::FMSB:0],{fp32Pkg::FMSB+1{1'b0}}};
     6'b01????:  mo1 = {1'b1,b1[fp32Pkg::FMSB:0],{fp32Pkg::FMSB+1{1'b0}}};
-		6'b001???:	mo1 = {1'b1,qNaN|3'd4,{FMSB+1{1'b0}}};	// multiply inf * zero
+		6'b001???:	mo1 = {1'b1,qNaN|3'd4,{fp32Pkg::FMSB+1{1'b0}}};	// multiply inf * zero
 		6'b0001??:	mo1 = 0;	// mul inf's
 		6'b00001?:	mo1 = 0;	// mul inf's
 		6'b000001:	mo1 = 0;	// mul overflow

@@ -1,6 +1,6 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2020-2022  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2020-2025  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
@@ -53,12 +53,12 @@ parameter QZEROZERO	= 4'd3;
 parameter QSQRTINF	= 4'd5;
 parameter QSQRTNEG	= 4'd6;
 
-`define	QSUBINFS	31'h7FC00001	// - infinity - infinity
-`define QINFDIVS	31'h7FC00002	// - infinity / infinity
-`define QZEROZEROS	31'h7FC00003	// - zero / zero
-`define QINFZEROS	31'h7FC00004	// - infinity X zero
-`define QSQRTINFS	31'h7FC00005	// - square root of infinity
-`define QSQRTNEGS	31'h7FC00006	// - square root of negaitve number
+`define	QSUBINFS	31'h7FC20000	// - infinity - infinity
+`define QINFDIVS	31'h7FC40000	// - infinity / infinity
+`define QZEROZEROS	31'h7FC60000	// - zero / zero
+`define QINFZEROS	31'h7FC80000	// - infinity X zero
+`define QSQRTINFS	31'h7FCA0000	// - square root of infinity
+`define QSQRTNEGS	31'h7FCC0000	// - square root of negaitve number
 
 `define	POINT5S		32'h3F000000
 `define ZEROS			32'h00000000

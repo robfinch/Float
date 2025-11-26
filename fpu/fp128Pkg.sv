@@ -41,19 +41,29 @@ parameter QSQRTINF	= 4'd5;
 parameter QSQRTNEG	= 4'd6;
 
 `define	QINFOQ		112'hFF800000_0000000000_0000000000		// info
+`define	QSUBINFQ 	127'h7F_FF08000000_0000000000_0000000000	// - infinity - infinity
+`define QINFDIVQ 	127'h7F_FF10000000_0000000000_0000000000	// - infinity / infinity
+`define QZEROZEROQ  127'h7F_FF18000000_0000000000_0000000000	// - zero / zero
+`define QINFZEROQ	127'h7F_FF20000000_0000000000_0000000000	// - infinity X zero
+`define QSQRTINFQ	127'h7F_FF28000000_0000000000_0000000000	// - square root of infinity
+`define QSQRTNEGQ	127'h7F_FF30000000_0000000000_0000000000	// - square root of negaitve number
+/*
 `define	QSUBINFQ 	127'h7F_FF00000000_0000000000_0000000001	// - infinity - infinity
 `define QINFDIVQ 	127'h7F_FF00000000_0000000000_0000000002	// - infinity / infinity
 `define QZEROZEROQ  127'h7F_FF00000000_0000000000_0000000003	// - zero / zero
 `define QINFZEROQ	127'h7F_FF00000000_0000000000_0000000004	// - infinity X zero
 `define QSQRTINFQ	127'h7F_FF00000000_0000000000_0000000005	// - square root of infinity
 `define QSQRTNEGQ	127'h7F_FF00000000_0000000000_0000000006	// - square root of negaitve number
-
+*/
 `define AIN			3'd0
 `define BIN			3'd1
 `define CIN			3'd2
 `define RES			3'd3
 `define POINT5	3'd4
 `define ZERO		3'd5
+
+`define ONEQ		128'h3FFF0000_00000000_00000000_00000000
+`define ZEROQ		128'h00000000_00000000_00000000_00000000
 
 `define SUPPORT_DENORMALS   1'b1
 //`define MIN_LATENCY		1'b1

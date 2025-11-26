@@ -37,7 +37,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //                                                                          
-//
+// 775 LUTs / 775 FFs / 2 DSPs
 // ============================================================================
 
 import fp32Pkg::*;

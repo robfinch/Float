@@ -147,7 +147,7 @@ reg a_gt_b3;
 reg op3;
 wire sa3, sb3;
 wire [2:0] rm3;
-reg [FMSB+1:0] mfs3;
+reg [fp32Pkg::FMSB+1:0] mfs3;
 
 always @(posedge clk)
   if (ce) resZero3 <= (realOp2 & expeq & maneq) ||	// subtract, same magnitude
@@ -193,7 +193,7 @@ always @(posedge clk)
 always @(posedge clk)
   if (ce) xb4 <= xb3;
 always @(posedge clk)
-	if (ce) xo4 <= (xaInf3&xbInf3) ? {EMSB+1{1'b1}} : resZero3 ? 0 : xa_gt_xb3 ? xa3 : xb3;
+	if (ce) xo4 <= (xaInf3&xbInf3) ? {fp32Pkg::EMSB+1{1'b1}} : resZero3 ? 0 : xa_gt_xb3 ? xa3 : xb3;
 always @(posedge clk)
   if (ce) xa_gt_xb4 <= xa_gt_xb3;
 
@@ -239,7 +239,7 @@ always @(posedge clk)
 reg [7:0] xdif6;
 wire [fp32Pkg::FMSB+1:0] mfs6;
 always @(posedge clk)
-  if (ce) xdif6 <= xdiff5 > FMSB+4 ? FMSB+4 : xdiff5;
+  if (ce) xdif6 <= xdiff5 > fp32Pkg::FMSB+4 ? fp32Pkg::FMSB+4 : xdiff5;
 ft_delay #(.WID(fp32Pkg::FMSB+2), .DEP(3)) udly6a (.clk(clk), .ce(ce), .i(mfs3), .o(mfs6));
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
@@ -342,11 +342,11 @@ reg [fp32Pkg::FX:0] mo12;	// mantissa output
 always @(posedge clk)
 if (ce)
 	casez({abInf11,aNan11,bNan11,xoinf11})
-	4'b1???:	mo12 <= {1'b0,op11,{FMSB-1{1'b0}},op11,{FMSB{1'b0}}};	// inf +/- inf - generate QNaN on subtract, inf on add
-	4'b01??:	mo12 <= {1'b0,fracta11[FMSB+1:0],{FMSB{1'b0}}};
-	4'b001?: 	mo12 <= {1'b0,fractb11[FMSB+1:0],{FMSB{1'b0}}};
+	4'b1???:	mo12 <= {1'b0,op11,{fp32Pkg::FMSB-1{1'b0}},op11,{fp32Pkg::FMSB{1'b0}}};	// inf +/- inf - generate QNaN on subtract, inf on add
+	4'b01??:	mo12 <= {1'b0,fracta11[fp32Pkg::FMSB+1:0],{fp32Pkg::FMSB{1'b0}}};
+	4'b001?: 	mo12 <= {1'b0,fractb11[fp32Pkg::FMSB+1:0],{fp32Pkg::FMSB{1'b0}}};
 	4'b0001:	mo12 <= 1'd0;
-	default:	mo12 <= {mab11,{FMSB-2{1'b0}}};	// mab has an extra lead bit and three trailing bits
+	default:	mo12 <= {mab11,{fp32Pkg::FMSB-2{1'b0}}};	// mab has an extra lead bit and three trailing bits
 	endcase
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
@@ -357,8 +357,8 @@ wire [fp32Pkg::EMSB:0] xo;	// de normalized exponent output
 wire [fp32Pkg::FX:0] mo;	// mantissa output
 
 ft_delay #(.WID(1), .DEP(9)) udly13a (.clk(clk), .ce(ce), .i(so4), .o(so));
-ft_delay #(.WID(EMSB+1), .DEP(3)) udly13b (.clk(clk), .ce(ce), .i(xo10), .o(xo));
-ft_delay #(.WID(FX+1), .DEP(1)) u13c (.clk(clk), .ce(ce), .i(mo12), .o(mo) );
+ft_delay #(.WID(fp32Pkg::EMSB+1), .DEP(3)) udly13b (.clk(clk), .ce(ce), .i(xo10), .o(xo));
+ft_delay #(.WID(fp32Pkg::FX+1), .DEP(1)) u13c (.clk(clk), .ce(ce), .i(mo12), .o(mo) );
 
 assign o.sign = so;
 assign o.exp = xo;
