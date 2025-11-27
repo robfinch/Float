@@ -84,6 +84,7 @@ wire aNan1, bNan1, cNan1, dNan1;
 wire az1, bz1, cz1, dz1;
 wire aInf1, bInf1, cInf1, dInf1;
 reg op1;
+reg [63:0] adr1;
 
 fpDecomp64Reg u1a (.clk(clk), .ce(ce), .i(a), .sgn(sa1), .exp(xa1), .fract(fracta1), .xz(a_dn1), .vz(az1), .inf(aInf1), .nan(aNan1) );
 fpDecomp64Reg u1b (.clk(clk), .ce(ce), .i(b), .sgn(sb1), .exp(xb1), .fract(fractb1), .xz(b_dn1), .vz(bz1), .inf(bInf1), .nan(bNan1) );
@@ -92,6 +93,8 @@ fpDecomp64Reg u1d (.clk(clk), .ce(ce), .i(d), .sgn(sd1), .exp(xd1), .fract(fract
 
 always_ff @(posedge clk)
 	if (ce) op1 <= op;
+always_ff @(posedge clk)
+	if (ce) adr1 <= bradr;
 
 // -----------------------------------------------------------
 // Clock #2
@@ -190,7 +193,10 @@ reg xcInf5;
 reg [2:0] rm5;
 reg op5;
 reg sa5, sb5, sc5, sd5;
+reg [63:0] adr5;
 
+always_ff @(posedge clk)
+	if (ce) adr5 <= adr1;
 always_ff @(posedge clk)
 	if (ce) rm5 <= rm;
 always_ff @(posedge clk)
@@ -284,7 +290,7 @@ always_comb
 	casez({aNan5,bNan5,qNaNOutab5,aInf5,bInf5,overab5})
 	6'b1?????:  moab6 <= {1'b1,1'b1,a5[fp64Pkg::FMSB-1:0],{fp64Pkg::FMSB+1{1'b0}}};
   6'b01????:  moab6 <= {1'b1,1'b1,b5[fp64Pkg::FMSB-1:0],{fp64Pkg::FMSB+1{1'b0}}};
-	6'b001???:	moab6 <= {1'b1,qNaN|(64'd4 << (fp64Pkg::FMSB-4))|bradr[63:20],{fp64Pkg::FMSB+1{1'b0}}};	// multiply inf * zero
+	6'b001???:	moab6 <= {1'b1,qNaN|(64'd4 << (fp64Pkg::FMSB-4))|adr5[63:16],{fp64Pkg::FMSB+1{1'b0}}};	// multiply inf * zero
 	6'b0001??:	moab6 <= 0;	// mul inf's
 	6'b00001?:	moab6 <= 0;	// mul inf's
 	6'b000001:	moab6 <= 0;	// mul overflow
@@ -295,7 +301,7 @@ always_comb
 	casez({cNan5,dNan5,qNaNOutcd5,cInf5,dInf5,overcd5})
 	6'b1?????:  mocd6 <= {1'b1,1'b1,a5[fp64Pkg::FMSB-1:0],{fp64Pkg::FMSB+1{1'b0}}};
   6'b01????:  mocd6 <= {1'b1,1'b1,b5[fp64Pkg::FMSB-1:0],{fp64Pkg::FMSB+1{1'b0}}};
-	6'b001???:	mocd6 <= {1'b1,qNaN|(64'd4 << (fp64Pkg::FMSB-4))|bradr[63:20],{fp64Pkg::FMSB+1{1'b0}}};	// multiply inf * zero
+	6'b001???:	mocd6 <= {1'b1,qNaN|(64'd4 << (fp64Pkg::FMSB-4))|adr5[63:16],{fp64Pkg::FMSB+1{1'b0}}};	// multiply inf * zero
 	6'b0001??:	mocd6 <= 0;	// mul inf's
 	6'b00001?:	mocd6 <= 0;	// mul inf's
 	6'b000001:	mocd6 <= 0;	// mul overflow
@@ -422,7 +428,10 @@ reg abInf9,cdInf9;
 reg op9;
 reg resZero9;
 reg nan_col9;
+reg [63:0] adr9;
 
+always_ff @(posedge clk)
+	if (ce) adr9 <= adr5;
 always_ff @(posedge clk)
 	if (ce) op9 <= op5;
 always_ff @(posedge clk)
@@ -605,7 +614,10 @@ reg so13;
 reg resZero13;
 reg xunderflow13;
 reg nan_col13;
+reg [63:0] adr13;
 
+always_ff @(posedge clk)
+	if (ce) adr13 <= adr9;
 always_ff @(posedge clk)
 	if (ce) so13 <= so9;
 always_ff @(posedge clk)
@@ -739,10 +751,10 @@ always_ff @(posedge clk)
 always_ff @(posedge clk)
 	if (ce) nan_col17 <= nan_col13 | (Nanab16 & Nancd16);
 
-always @(posedge clk)
+always_ff @(posedge clk)
 if (ce)
 	casez({abInf16&cdInf16,Nanab16,Nancd16,exinf16,resZero13})
-	5'b1????:	mo17 <= {1'b0,op16,2'b00,op16,{fp64Pkg::FMSB-3{1'b0}}|(op16?bradr[63:20]:64'd0),{fp64Pkg::FMSB{1'b0}}};	// inf +/- inf - generate QNaN on subtract, inf on add
+	5'b1????:	mo17 <= {1'b0,op16,2'b00,op16,{fp64Pkg::FMSB-3{1'b0}}|(op16?adr13[63:16]:64'd0),{fp64Pkg::FMSB{1'b0}}};	// inf +/- inf - generate QNaN on subtract, inf on add
 	5'b01???:	mo17 <= {1'b0,moab16};
 	5'b001??:	mo17 <= {1'b0,mocd16};
 	5'b0001?:	mo17 <= 1'd0;
