@@ -1,6 +1,6 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2023  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2023-2025  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
@@ -67,12 +67,17 @@ begin
 	o[2] = (lt|eq) & !unordered;
 	o[3] = lt1;
 	o[4] = unordered;
-	o[7:5] = 3'd0;
+	o[5] = lt | unordered;
+	o[6] = (lt|eq) | unordered;
+	o[7] = 1'b0;
 	o[8] = ne;
 	o[9] = ~lt & !unordered;
 	o[10] = ~(lt|eq) & !unordered;
 	o[11] = ~lt1;
 	o[12] = ~unordered;
+	o[13] = ~lt | unordered;
+	o[14] = ~(lt|eq) | unordered;
+	o[15] = 1'b0;
 end
 
 // an unorder comparison will signal a nan exception
