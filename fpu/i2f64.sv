@@ -1,6 +1,6 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2022  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2022-2025  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
@@ -50,7 +50,7 @@ wire [2:0] rmd;
 delay1 #(3)   u0 (.clk(clk), .ce(ce), .i(rm),     .o(rmd) );
 delay1 #(1)   u1 (.clk(clk), .ce(ce), .i(i==0),   .o(iz) );
 delay1 #(fp64Pkg::FPWID) u2 (.clk(clk), .ce(ce), .i(imag1),  .o(imag) );
-delay1 #(1)   u3 (.clk(clk), .ce(ce), .i(i[MSB]), .o(so) );
+delay1 #(1)   u3 (.clk(clk), .ce(ce), .i(i[fp64Pkg::FPWID-1]), .o(so) );
 cntlz128Reg    u4 (.clk(clk), .ce(ce), .i(imag1), .o(lz[5:0]) );
 assign lz[7:6]=2'b00;
 
@@ -65,7 +65,7 @@ wire s = |simag[fp64Pkg::EMSB:0];	// "sticky" bit
 reg rnd;
 
 // Compute the round bit
-always @(rmd,g,r,s,so)
+always_comb
 	case (rmd)
 	3'd0:	rnd = (g & r) | (r & s);	// round to nearest even
 	3'd1:	rnd = 0;					// round to zero (truncate)

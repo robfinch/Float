@@ -46,8 +46,8 @@ wire az, bz;
 wire nan_a, nan_b;
 wire infa, infb;
 
-fpDecomp64 u1(.i(a), .sgn(sa), .exp(xa), .man(ma), .vz(az), .inf(infa), .qnan(), .snan(), .nan(nan_a) );
-fpDecomp64 u2(.i(b), .sgn(sb), .exp(xb), .man(mb), .vz(bz), .inf(infb), .qnan(), .snan(), .nan(nan_b) );
+fpDecomp64 u1(.i(a), .sgn(sa), .exp(xa), .man(ma), .vz(az), .inf(infa), .qnan(), .snan(), .nan(nan_a), .fract(), .xz(), .mz(), .xinf() );
+fpDecomp64 u2(.i(b), .sgn(sb), .exp(xb), .man(mb), .vz(bz), .inf(infb), .qnan(), .snan(), .nan(nan_b), .fract(), .xz(), .mz(), .xinf() );
 
 wire unordered = nan_a | nan_b;
 

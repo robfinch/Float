@@ -142,6 +142,7 @@ always @(posedge clk)
 reg [fp32Pkg::EMSB:0] xa3, xb3;
 reg resZero3;
 wire xaInf3, xbInf3;
+wire aInf3, bInf3;
 reg xa_gt_xb3;
 reg a_gt_b3;
 reg op3;
@@ -273,6 +274,7 @@ reg [fp32Pkg::FMSB+4:0] md8;
 wire [fp32Pkg::FMSB+1:0] fracta8, fractb8;
 wire xa_gt_xb8;
 wire a_gt_b8;
+wire op8;
 always @(posedge clk)
   if (ce) md8 <= ({mfs7,3'b0} >> xdif7)|sticky7;
 

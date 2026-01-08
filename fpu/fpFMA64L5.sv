@@ -130,8 +130,8 @@ always_comb
 
 reg [127:0] fractoo;
 mult64x64combo umul1 (
-	.a({14'd0,fracta1[fp64Pkg::FMSB+1:0]}),
-	.b({14'd0,fractb1[fp64Pkg::FMSB+1:0]}),
+	.a({11'd0,fracta1[fp64Pkg::FMSB+1:0]}),
+	.b({11'd0,fractb1[fp64Pkg::FMSB+1:0]}),
 	.o(fractoo)
 );
 
@@ -478,7 +478,7 @@ always_comb
 reg [7:0] xdif11;
 
 always_comb
-	xdif11 <= xdiff10 > fp64Pkg::FX+3 ? fp64Pkg::FX+3 : xdiff10;
+	xdif11 = xdiff10 > fp64Pkg::FX+3 ? fp64Pkg::FX+3 : xdiff10;
 
 // -----------------------------------------------------------
 // Clock #12
@@ -489,8 +489,11 @@ wire sticky;
 reg sticky12;
 reg [fp64Pkg::FX:0] mfs12;
 reg [7:0] xdif12;
+reg [6:0] redorA;
 
-redorN #(.BSIZE(fp64Pkg::FX+1)) uredor1 (.a({1'b0,xdif11+fp64Pkg::FMSB}), .b(mfs), .o(sticky));
+always_comb
+	redorA = fp64Pkg::FMSB + xdif11;
+redorN #(.BSIZE(fp64Pkg::FX+1)) uredor1 (.a(redorA), .b(mfs), .o(sticky));
 /*
 generate
 begin

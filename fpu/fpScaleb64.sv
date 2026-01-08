@@ -38,12 +38,14 @@
 
 import fp64Pkg::*;
 
-module fpScaleb64(clk, ce, a, b, o);
+module fpScaleb64(clk, ce, a, b, o, over, under);
 input clk;
 input ce;
 input FP64 a;
 input FP64 b;
 output FP64 o;
+output reg over;
+output reg under;
 
 wire [4:0] cmp_o;
 wire nana, nanb;
@@ -87,6 +89,8 @@ always @(posedge clk)
 	if (ce) sa2 <= sa1;
 always @(posedge clk)
 if (ce) begin
+	under <= 1'b0;
+	over <= 1'b0;
 	if (anan1) begin
 		xa2 <= xa1a;
 		ma2 <= ma1;
@@ -95,11 +99,13 @@ if (ce) begin
 	else if (bs1 & xa1b[fp64Pkg::EMSB+1]) begin
 		xa2 <= 1'd0;
 		ma2 <= ma1;
+		under <= 1'b1;
 	end
 	// overflow ? -> set value to infinity
 	else if (~bs1 & xa1b[fp64Pkg::EMSB+1]) begin
 		xa2 <= infXp;
 		ma2 <= 1'd0;
+		over <= 1'b1;
 	end
 	else begin
 		xa2 <= xa1b;

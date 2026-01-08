@@ -74,12 +74,12 @@ reg [fp128Pkg::EMSB:0] xo1;		// extra bit for sign
 reg [fp128Pkg::FX:0] mo1;
 
 // constants
-wire [fp128Pkg::EMSB:0] infXp = {EMSB+1{1'b1}};	// infinite / NaN - all ones
+wire [fp128Pkg::EMSB:0] infXp = {fp128Pkg::EMSB+1{1'b1}};	// infinite / NaN - all ones
 // The following is the value for an exponent of zero, with the offset
 // eg. 8'h7f for eight bit exponent, 11'h7ff for eleven bit exponent, etc.
-wire [fp128Pkg::EMSB:0] bias = {1'b0,{EMSB{1'b1}}};	//2^0 exponent
+wire [fp128Pkg::EMSB:0] bias = {1'b0,{fp128Pkg::EMSB{1'b1}}};	//2^0 exponent
 // The following is a template for a quiet nan. (MSB=1)
-wire [fp128Pkg::FMSB:0] qNaN  = {1'b1,{FMSB{1'b0}}};
+wire [fp128Pkg::FMSB:0] qNaN  = {1'b1,{fp128Pkg::FMSB{1'b0}}};
 
 // variables
 reg [fp128Pkg::FX:0] fract1,fract1a;
@@ -176,7 +176,7 @@ always @(posedge clk)
 `endif
 		6'b1?????:  mo1 = {1'b1,a1[fp128Pkg::FMSB:0],{fp128Pkg::FMSB+1{1'b0}}};
     6'b01????:  mo1 = {1'b1,b1[fp128Pkg::FMSB:0],{fp128Pkg::FMSB+1{1'b0}}};
-		6'b001???:	mo1 = {1'b1,qNaN|3'd4,{FMSB+1{1'b0}}};	// multiply inf * zero
+		6'b001???:	mo1 = {1'b1,qNaN|3'd4,{fp128Pkg::FMSB+1{1'b0}}};	// multiply inf * zero
 		6'b0001??:	mo1 = 0;	// mul inf's
 		6'b00001?:	mo1 = 0;	// mul inf's
 		6'b000001:	mo1 = 0;	// mul overflow

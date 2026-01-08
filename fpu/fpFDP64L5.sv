@@ -43,10 +43,10 @@
 
 import fp64Pkg::*;
 
-module fpFDP64L5 (clk, ce, adr, op, rm, a, b, c, d, o, under, over, inf, zero, nan_col);
+module fpFDP64L5 (clk, ce, nan_info, op, rm, a, b, c, d, o, under, over, inf, zero, nan_col);
 input clk;
 input ce;
-input [63:0] adr;	// address of FDP instruction
+input [47:0] nan_info;	// address of FDP instruction
 input op;					// operation 0 = add, 1 = subtract
 input [2:0] rm;
 input  FP64 a, b, c, d;
@@ -56,8 +56,6 @@ output over;
 output inf;
 output zero;
 output nan_col;
-
-wire [63:0] bradr = fnBitRev64(adr);
 
 // constants
 wire [fp64Pkg::EMSB:0] infXp = {fp64Pkg::EMSB+1{1'b1}};	// infinite / NaN - all ones
@@ -79,12 +77,12 @@ wire [fp64Pkg::FMSB:0] qNaN  = {1'b1,{fp64Pkg::FMSB{1'b0}}};
 wire sa1, sb1, sc1, sd1;			// sign bit
 wire [fp64Pkg::EMSB:0] xa1, xb1, xc1, xd1;	// exponent bits
 wire [fp64Pkg::FMSB+1:0] fracta1, fractb1, fractc1, fractd1;	// includes unhidden bit
-wire a_dn1, b_dn1, c_dn1, dn_dn1;			// a/b is denormalized
+wire a_dn1, b_dn1, c_dn1, d_dn1;			// a/b is denormalized
 wire aNan1, bNan1, cNan1, dNan1;
 wire az1, bz1, cz1, dz1;
 wire aInf1, bInf1, cInf1, dInf1;
 reg op1;
-reg [63:0] adr1;
+reg [47:0] nan_info1;
 
 fpDecomp64Reg u1a (.clk(clk), .ce(ce), .i(a), .sgn(sa1), .exp(xa1), .fract(fracta1), .xz(a_dn1), .vz(az1), .inf(aInf1), .nan(aNan1) );
 fpDecomp64Reg u1b (.clk(clk), .ce(ce), .i(b), .sgn(sb1), .exp(xb1), .fract(fractb1), .xz(b_dn1), .vz(bz1), .inf(bInf1), .nan(bNan1) );
@@ -94,7 +92,7 @@ fpDecomp64Reg u1d (.clk(clk), .ce(ce), .i(d), .sgn(sd1), .exp(xd1), .fract(fract
 always_ff @(posedge clk)
 	if (ce) op1 <= op;
 always_ff @(posedge clk)
-	if (ce) adr1 <= bradr;
+	if (ce) nan_info1 <= nan_info;
 
 // -----------------------------------------------------------
 // Clock #2
@@ -193,10 +191,10 @@ reg xcInf5;
 reg [2:0] rm5;
 reg op5;
 reg sa5, sb5, sc5, sd5;
-reg [63:0] adr5;
+reg [47:0] nan_info5;
 
 always_ff @(posedge clk)
-	if (ce) adr5 <= adr1;
+	if (ce) nan_info5 <= nan_info1;
 always_ff @(posedge clk)
 	if (ce) rm5 <= rm;
 always_ff @(posedge clk)
@@ -290,7 +288,7 @@ always_comb
 	casez({aNan5,bNan5,qNaNOutab5,aInf5,bInf5,overab5})
 	6'b1?????:  moab6 <= {1'b1,1'b1,a5[fp64Pkg::FMSB-1:0],{fp64Pkg::FMSB+1{1'b0}}};
   6'b01????:  moab6 <= {1'b1,1'b1,b5[fp64Pkg::FMSB-1:0],{fp64Pkg::FMSB+1{1'b0}}};
-	6'b001???:	moab6 <= {1'b1,qNaN|(64'd4 << (fp64Pkg::FMSB-4))|adr5[63:16],{fp64Pkg::FMSB+1{1'b0}}};	// multiply inf * zero
+	6'b001???:	moab6 <= {1'b1,qNaN|(64'd4 << (fp64Pkg::FMSB-4))|nan_info5,{fp64Pkg::FMSB+1{1'b0}}};	// multiply inf * zero
 	6'b0001??:	moab6 <= 0;	// mul inf's
 	6'b00001?:	moab6 <= 0;	// mul inf's
 	6'b000001:	moab6 <= 0;	// mul overflow
@@ -301,7 +299,7 @@ always_comb
 	casez({cNan5,dNan5,qNaNOutcd5,cInf5,dInf5,overcd5})
 	6'b1?????:  mocd6 <= {1'b1,1'b1,a5[fp64Pkg::FMSB-1:0],{fp64Pkg::FMSB+1{1'b0}}};
   6'b01????:  mocd6 <= {1'b1,1'b1,b5[fp64Pkg::FMSB-1:0],{fp64Pkg::FMSB+1{1'b0}}};
-	6'b001???:	mocd6 <= {1'b1,qNaN|(64'd4 << (fp64Pkg::FMSB-4))|adr5[63:16],{fp64Pkg::FMSB+1{1'b0}}};	// multiply inf * zero
+	6'b001???:	mocd6 <= {1'b1,qNaN|(64'd4 << (fp64Pkg::FMSB-4))|nan_info5,{fp64Pkg::FMSB+1{1'b0}}};	// multiply inf * zero
 	6'b0001??:	mocd6 <= 0;	// mul inf's
 	6'b00001?:	mocd6 <= 0;	// mul inf's
 	6'b000001:	mocd6 <= 0;	// mul overflow
@@ -428,10 +426,10 @@ reg abInf9,cdInf9;
 reg op9;
 reg resZero9;
 reg nan_col9;
-reg [63:0] adr9;
+reg [47:0] nan_info9;
 
 always_ff @(posedge clk)
-	if (ce) adr9 <= adr5;
+	if (ce) nan_info9 <= nan_info5;
 always_ff @(posedge clk)
 	if (ce) op9 <= op5;
 always_ff @(posedge clk)
@@ -614,10 +612,10 @@ reg so13;
 reg resZero13;
 reg xunderflow13;
 reg nan_col13;
-reg [63:0] adr13;
+reg [47:0] nan_info13;
 
 always_ff @(posedge clk)
-	if (ce) adr13 <= adr9;
+	if (ce) nan_info13 <= nan_info9;
 always_ff @(posedge clk)
 	if (ce) so13 <= so9;
 always_ff @(posedge clk)
@@ -754,7 +752,7 @@ always_ff @(posedge clk)
 always_ff @(posedge clk)
 if (ce)
 	casez({abInf16&cdInf16,Nanab16,Nancd16,exinf16,resZero13})
-	5'b1????:	mo17 <= {1'b0,op16,2'b00,op16,{fp64Pkg::FMSB-3{1'b0}}|(op16?adr13[63:16]:64'd0),{fp64Pkg::FMSB{1'b0}}};	// inf +/- inf - generate QNaN on subtract, inf on add
+	5'b1????:	mo17 <= {1'b0,op16,2'b00,op16,{fp64Pkg::FMSB-3{1'b0}}|(op16?nan_info13:64'd0),{fp64Pkg::FMSB{1'b0}}};	// inf +/- inf - generate QNaN on subtract, inf on add
 	5'b01???:	mo17 <= {1'b0,moab16};
 	5'b001??:	mo17 <= {1'b0,mocd16};
 	5'b0001?:	mo17 <= 1'd0;
@@ -777,10 +775,10 @@ endmodule
 
 // Multiplier with normalization and rounding.
 
-module fpFDP64nrL8(clk, ce, adr, op, rm, a, b, c, d, o, inf, zero, overflow, underflow, inexact, nancol);
+module fpFDP64nrL8(clk, ce, nan_info, op, rm, a, b, c, d, o, inf, zero, overflow, underflow, inexact, nan, nancol);
 input clk;
 input ce;
-input [63:0] adr;
+input [47:0] nan_info;
 input op;
 input [2:0] rm;
 input  FP64 a, b, c, d;
@@ -790,6 +788,7 @@ output inf;
 output overflow;
 output underflow;
 output inexact;
+output nan;
 output nancol;		// NaN collision
 
 wire FP64X fdp_o;
@@ -806,7 +805,7 @@ fpFDP64L5 u1
 (
 	.clk(clk),
 	.ce(ce),
-	.adr(adr),
+	.nan_info(nan_info),
 	.op(op),
 	.rm(rm),
 	.a(a),
@@ -832,10 +831,10 @@ fpNormalize64L2 u2
 );
 delay6 #(3)			u9 (.clk(clk), .ce(ce), .i(rm), .o(rm6));
 fpRound64L1 u3(.clk(clk), .ce(ce), .rm(rm6), .i(fpn0), .o(o) );
-fpDecomp64 u4(.i(o), .xz(), .vz(zero), .inf(inf));
+fpDecomp64 u4(.i(o), .sgn(), .exp(), .fract(), .xz(), .vz(zero), .inf(inf), .nan(nan));
 vtdl #(.WID(1)) u5 (.clk(clk), .ce(ce), .a(4'd3), .d(fdp_underflow), .q(underflow));
 vtdl #(.WID(1)) u6 (.clk(clk), .ce(ce), .a(4'd3), .d(fdp_overflow), .q(overflow));
-vtdl #(.WID(1)) u7 (.clk(clk), .ce(ce), .a(4'd3), .d(fdp_nan_col), .q(nan_col));
+vtdl #(.WID(1)) u7 (.clk(clk), .ce(ce), .a(4'd3), .d(fdp_nan_col), .q(nancol));
 delay1		#(1)	u8 (.clk(clk), .ce(ce), .i(norm_inexact), .o(inexact));
 //assign overflow = inf;
 
