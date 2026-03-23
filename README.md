@@ -7,6 +7,7 @@
 
 * There are two versions of modules, one pipelined and one combinational logic.
 * The combinational logic versions allow the pipeline depth to be varied based on the number of register layers added at the output. The re-timing option in synthesis should then pipeline the module.
+* The most recent additions are variable latency fused multiply-add modules. These are named with a 'LN' suffix like 'fpFMA64LN.sv'
 
 * The pipelined version is named as in 'fpFMA64.sv' while the combinational logic version has 'combo' appended to the name as in 'fpFMA64combo.sv'.
 
