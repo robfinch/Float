@@ -5,7 +5,7 @@
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	fpRound64L3.sv
+//	fpRoundL3.sv
 //    - floating point rounding unit
 //    - IEEE 754 representation
 //		- 3 clock latency
@@ -37,19 +37,18 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //                                                                          
+// 120 LUTs / 250 FFs / 400 MHz		(64-bit)
 // ============================================================================
 
-import fp64Pkg::*;
-
-module fpRound64L3(clk, ce, rm, i, o);
+module fpRoundL3(clk, ce, rm, i, o);
 parameter EMSB = fp64Pkg::EMSB;
 parameter MSB = fp64Pkg::MSB;
 parameter FMSB = fp64Pkg::FMSB;
 input clk;
 input ce;
 input [2:0] rm;			// rounding mode
-input FP64N i;		// intermediate format input
-output FP64 o;		// rounded output
+input [MSB+3:0] i;	// intermediate format input
+output [MSB:0] o;		// rounded output
 
 //------------------------------------------------------------
 // variables
@@ -149,8 +148,8 @@ if (ce)
 	4'b11??:	mo <= 1'd0;						// number became infinite, no need to check carry etc., rnd would be zero if input was NaN or infinite
 	endcase
 
-assign o.sign = so;
-assign o.exp = xo;
-assign o.sig = mo;
+assign o[MSB] = so;
+assign o[MSB-1:MSB-EMSB-1] = xo;
+assign o[FMSB:0] = mo;
 
 endmodule

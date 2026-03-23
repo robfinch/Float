@@ -5,7 +5,7 @@
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
 //
-//	fpNormalize64L8.sv
+//	fpNormalizeL8.sv
 //    - floating point normalization unit
 //    - eight cycle latency
 //    - IEEE 754 representation
@@ -53,13 +53,15 @@
 // 610 LUTs / 680 FFs / 300 MHz
 // ============================================================================
 
-import fp64Pkg::*;
-
-module fpNormalize64L8(clk, ce, i, o, under_i, under_o, inexact_o);
+module fpNormalizeL8(clk, ce, i, o, under_i, under_o, inexact_o);
+parameter MSB = fp64Pkg::MSB;
+parameter EMSB = fp64Pkg::EMSB;
+parameter FMSB = fp64Pkg::FMSB;
+parameter FX = fp64Pkg::FX;
 input clk;
 input ce;
-input FP64X i;		// expanded format input
-output FP64N o;		// normalized output + guard, sticky and round bits, + 1 whole digit
+input FP64X i;			// expanded format input
+output [MSB+3:0] o;	// normalized output + guard, sticky and round bits, + 1 whole digit
 input under_i;
 output reg under_o;
 output reg inexact_o;
@@ -68,7 +70,7 @@ integer n,n1;
 // ----------------------------------------------------------------------------
 // No Clock required
 // ----------------------------------------------------------------------------
-reg [fp64Pkg::EMSB:0] xo0;
+reg [EMSB:0] xo0;
 reg so0;
 
 always_comb
@@ -91,7 +93,7 @@ always_ff @(posedge clk)
 always_ff @(posedge clk)
 	if (ce) xInf1a <= &xo0 & !under_i;
 always_ff @(posedge clk)
-	if (ce) xInf1b <= &xo0[fp64Pkg::EMSB:1] & !under_i;
+	if (ce) xInf1b <= &xo0[EMSB:1] & !under_i;
 always_ff @(posedge clk)
 	if (ce) xInf1c = &xo0;
 
@@ -104,7 +106,7 @@ always_ff @(posedge clk)
 // ----------------------------------------------------------------------------
 reg so2;
 reg xInf2c, xInf2b;
-reg [fp64Pkg::EMSB:0] xo2;
+reg [EMSB:0] xo2;
 reg incExpByOne2, incExpByTwo2;
 reg under2;
 FP64X i2;
@@ -122,9 +124,9 @@ always_ff @(posedge clk)
 always_ff @(posedge clk)
 	if (ce) under2 <= under_i;
 always_ff @(posedge clk)
-	if (ce) incExpByTwo2 <= !xInf1b & i1[fp64Pkg::FX];
+	if (ce) incExpByTwo2 <= !xInf1b & i1[FX];
 always_ff @(posedge clk)
-	if (ce) incExpByOne2 <= !xInf1a & i1[fp64Pkg::FX-1];
+	if (ce) incExpByOne2 <= !xInf1a & i1[FX-1];
 
 // ----------------------------------------------------------------------------
 // Clock #3
@@ -136,7 +138,7 @@ reg so3;
 wire incExpByTwo3;
 wire incExpByOne3;
 FP64X i3;
-reg [fp64Pkg::EMSB:0] xo3;
+reg [EMSB:0] xo3;
 reg zeroMan3;
 reg under3;
 reg xInf3;
@@ -155,7 +157,7 @@ always_ff @(posedge clk)
 	if (ce) xo3 <= xo2 + (incExpByTwo2 ? 2'd2 : incExpByOne2 ? 2'd1 : 2'd0);
 
 always_ff @(posedge clk)
-	if (ce) zeroMan3 <= ((xv3b[fp64Pkg::EMSB+1]|| &xv3b[fp64Pkg::EMSB:0])||(xv3a[fp64Pkg::EMSB+1]| &xv3a[fp64Pkg::EMSB:0]))
+	if (ce) zeroMan3 <= ((xv3b[EMSB+1]|| &xv3b[EMSB:0])||(xv3a[EMSB+1]| &xv3a[EMSB:0]))
 											 && !under2 && !xInf2c;
 always_ff @(posedge clk)
 	if (ce) under3 <= under2;
@@ -169,8 +171,8 @@ always_ff @(posedge clk)
 // ----------------------------------------------------------------------------
 
 reg so4;
-reg [fp64Pkg::EMSB:0] xo4;
-reg [fp64Pkg::FMSB+5:0] mo4;
+reg [EMSB:0] xo4;
+reg [FMSB+5:0] mo4;
 reg under4;
 reg inexact4;
 reg xInf4;
@@ -189,21 +191,21 @@ always_ff @(posedge clk)
 
 always_ff @(posedge clk)
 if (ce) 
-casez({zeroMan3,incExpByTwo3,incExpByOne3})
-3'b1??:	mo4 <= 1'd0;
-3'b01?:	mo4 <= {i3[fp64Pkg::FX:fp64Pkg::FMSB],|i3[fp64Pkg::FMSB-1:0]};
-3'b001:	mo4 <= {i3[fp64Pkg::FX-1:fp64Pkg::FMSB-1],|i3[fp64Pkg::FMSB-2:0]};
-default:	mo4 <= {i3[fp64Pkg::FX-2:fp64Pkg::FMSB-2],|i3[fp64Pkg::FMSB-3:0]};
-endcase
+	casez({zeroMan3,incExpByTwo3,incExpByOne3})
+	3'b1??:	mo4 <= 1'd0;
+	3'b01?:	mo4 <= {i3[FX:FMSB],|i3[FMSB-1:0]};
+	3'b001:	mo4 <= {i3[FX-1:FMSB-1],|i3[FMSB-2:0]};
+	default:	mo4 <= {i3[FX-2:FMSB-2],|i3[FMSB-3:0]};
+	endcase
 
 always_ff @(posedge clk)
 if (ce) 
-casez({zeroMan3,incExpByTwo3,incExpByOne3})
-3'b1??:	inexact4 <= 1'd0;
-3'b01?:	inexact4 <= |i3[fp64Pkg::FMSB+1:0];
-3'b001:	inexact4 <= |i3[fp64Pkg::FMSB:0];
-default:	inexact4 <= |i3[fp64Pkg::FMSB-1:0];
-endcase
+	casez({zeroMan3,incExpByTwo3,incExpByOne3})
+	3'b1??:	inexact4 <= 1'd0;
+	3'b01?:	inexact4 <= |i3[FMSB+1:0];
+	3'b001:	inexact4 <= |i3[FMSB:0];
+	default:	inexact4 <= |i3[FMSB-1:0];
+	endcase
 
 // ----------------------------------------------------------------------------
 // Clock edge #5
@@ -211,8 +213,8 @@ endcase
 // ----------------------------------------------------------------------------
 reg so5;
 reg [7:0] leadingZeros5;
-reg [fp64Pkg::EMSB:0] xo5;
-reg [fp64Pkg::FMSB+5:0] mo5;
+reg [EMSB:0] xo5;
+reg [FMSB+5:0] mo5;
 reg xInf5;
 reg inexact5;
 reg under5;
@@ -272,15 +274,15 @@ endgenerate
 wire [6:0] ffo4;
 ffo96 uffo5 (.i({48'd0,mo4}), .o(ffo4));
 always_ff @(posedge clk)
-  if (ce) leadingZeros5 <= fp64Pkg::FMSB+5-ffo4;
+  if (ce) leadingZeros5 <= FMSB+5-ffo4;
 `else
 always_ff @(posedge clk)
 if (ce)
-casez(mo4[fp64Pkg::FMSB+5:fp64Pkg::FMSB+4])
-2'b1?:  leadingZeros5 <= 8'd0;
-2'b01:  leadingZeros5 <= 8'd1;
-2'b00:  leadingZeros5 <= 8'd2;
-endcase
+	casez(mo4[FMSB+5:FMSB+4])
+	2'b1?:  leadingZeros5 <= 8'd0;
+	2'b01:  leadingZeros5 <= 8'd1;
+	2'b00:  leadingZeros5 <= 8'd2;
+	endcase
 `endif
 
 
@@ -300,8 +302,8 @@ reg [7:0] lshiftAmt6;
 reg [7:0] rshiftAmt6;
 reg rightOrLeft6;	// 0=left,1=right
 reg xInf6;
-reg [fp64Pkg::EMSB:0] xo6;
-reg [fp64Pkg::FMSB+5:0] mo6;
+reg [EMSB:0] xo6;
+reg [FMSB+5:0] mo6;
 reg zeroMan6;
 reg inexact6;
 
@@ -332,9 +334,9 @@ always_ff @(posedge clk)
 // ----------------------------------------------------------------------------
 
 reg so7;
-reg [fp64Pkg::EMSB:0] xo7;
+reg [EMSB:0] xo7;
 reg rightOrLeft7;
-reg [fp64Pkg::FMSB+5:0] mo7l, mo7r;
+reg [FMSB+5:0] mo7l, mo7r;
 reg St6,St7;
 reg inexact7;
 
@@ -360,7 +362,7 @@ always_ff @(posedge clk)
 always_ff @(posedge clk)
 if (ce) begin
   St6 = 1'b0;
-  for (n1 = 0; n1 < fp64Pkg::FMSB+5; n1 = n1 + 1)
+  for (n1 = 0; n1 < FMSB+5; n1 = n1 + 1)
     if (n1 <= rshiftAmt6 + 1) St6 = St6|mo6[n1];
 end
 always_ff @(posedge clk)
@@ -372,8 +374,8 @@ always_ff @(posedge clk)
 // ----------------------------------------------------------------------------
 
 reg so;
-reg [fp64Pkg::EMSB:0] xo;
-reg [fp64Pkg::FMSB+5:0] mo;
+reg [EMSB:0] xo;
+reg [FMSB+5:0] mo;
 always_ff @(posedge clk)
 	if (ce) so <= so7;
 always_ff @(posedge clk)
@@ -385,9 +387,9 @@ always_ff @(posedge clk)
 always_ff @(posedge clk)
 	if (ce) mo <= rightOrLeft7 ? mo7r|{St7,2'b0} : mo7l;
 
-assign o.sign = so;
-assign o.exp = xo;
-assign o.sig = mo[fp64Pkg::FMSB+5:2];
+assign o[MSB+3] = so;
+assign o[MSB+3-1:MSB+3-1-EMSB] = xo;
+assign o[FMSB+3:0] = mo[FMSB+5:2];
 
 endmodule
 	

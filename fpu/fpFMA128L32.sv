@@ -767,7 +767,21 @@ fpNormalize128L8 u2
 	.inexact_o(norm_inexact)
 );
 vtdl #(.WID(3), .DEP(64)) u8 (.clk(clk), .ce(ce), .d(rm), .q(rm6), .a(40));
-fpRound128L3 u3(.clk(clk), .ce(ce), .rm(rm6), .i(fpn0), .o(o) );
+
+fpRoundL3 
+#(
+	.MSB(fp128Pkg::MSB),
+	.EMSB(fp128Pkg::EMSB),
+	.FMSB(fp128Pkg::FMSB)
+)
+u3 (
+	.clk(clk),
+	.ce(ce),
+	.rm(rm6),
+	.i(fpn0),
+	.o(o)
+);
+
 fpDecomp128 u4(.i(o), .xz(), .vz(zero), .inf(inf));
 vtdlx1					u5 (.clk(clk), .ce(ce), .a(4'd11), .d(fma_underflow), .q(underflow));
 vtdlx1					u6 (.clk(clk), .ce(ce), .a(4'd11), .d(fma_overflow), .q(overflow));

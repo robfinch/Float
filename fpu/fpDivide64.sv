@@ -1,6 +1,6 @@
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2006-2022  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2006-2026  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
@@ -42,17 +42,23 @@
 //+-inf * +-inf = -+inf    (this is handled by exOver)
 //+-inf * 0     = QNaN
 //+-0 / +-0      = QNaN
+//
+// Parameters:
+//	STYLE: 0=radix2,4=radix16,32=goldschmidt
+//
+// 1210 LUTs / 1475 FFs / 285 MHz	(radix 2)
 // ============================================================================
 
 import fp64Pkg::*;
-//`define GOLDSCHMIDT	1'b1
 
-module fpDivide64(rst, clk, clk4x, ce, ld, op, a, b, o, done, sign_exe, overflow, underflow);
+module fpDivide64(rst, clk, ce, ld, op, a, b, o, done, sign_exe, overflow, underflow);
 // FADD is a constant that makes the divider width a multiple of four and includes eight extra bits.			
 localparam FADD = 9;
+parameter STYLE = 0;
+localparam EMSB = fp64Pkg::EMSB;
+localparam FMSB = fp64Pkg::FMSB;
 input rst;
 input clk;
-input clk4x;
 input ce;
 input ld;
 input op;
@@ -70,29 +76,23 @@ reg	overflow=0;
 reg	underflow=0;
 
 reg so;
-reg [fp64Pkg::EMSB:0] xo;
+reg [EMSB:0] xo;
 reg [fp64Pkg::FX:0] mo;
-assign o = {so,xo,mo};
 
 // constants
-wire [fp64Pkg::EMSB:0] infXp = {fp64Pkg::EMSB+1{1'b1}};	// infinite / NaN - all ones
+wire [EMSB:0] infXp = {EMSB+1{1'b1}};	// infinite / NaN - all ones
 // The following is the value for an exponent of zero, with the offset
 // eg. 8'h7f for eight bit exponent, 11'h7ff for eleven bit exponent, etc.
-wire [fp64Pkg::EMSB:0] bias = {1'b0,{fp64Pkg::EMSB{1'b1}}};	//2^0 exponent
+wire [EMSB:0] bias = {1'b0,{EMSB{1'b1}}};	//2^0 exponent
 // The following is a template for a quiet nan. (MSB=1)
-wire [fp64Pkg::FMSB:0] qNaN  = {1'b1,{fp64Pkg::FMSB{1'b0}}};
+wire [FMSB:0] qNaN  = {1'b1,{FMSB{1'b0}}};
 
 // variables
-`ifndef GOLDSCHMIDT
-wire [(fp64Pkg::FMSB+FADD)*2-1:0] divo;
-`else
-wire [(fp64Pkg::FMSB+5)*2-1:0] divo;
-`endif
 
 // Operands
 wire sa, sb;			// sign bit
-wire [fp64Pkg::EMSB:0] xa, xb;	// exponent bits
-wire [fp64Pkg::FMSB+1:0] fracta, fractb;
+wire [EMSB:0] xa, xb;	// exponent bits
+wire [FMSB+1:0] fracta, fractb;
 wire a_dn, b_dn;			// a/b is denormalized
 wire az, bz;
 wire aInf, bInf;
@@ -116,20 +116,33 @@ ft_delay #(.WID(1), .DEP(1)) udly1 (.clk(clk), .ce(ce), .i(ld), .o(ld1));
 // - calculate fraction
 // -----------------------------------------------------------
 wire done3;
+wire [(FMSB+FADD)*2-1:0] divo;
+wire [(FMSB+FADD)*2-1:0] divo1;
+wire [(FMSB+5)*2-1:0] divogs;
+wire [(FMSB+6)*2+1:0] divo1gs;
 // Perform divide
 // Divider width must be a multiple of four
-`ifndef GOLDSCHMIDT
-fpdivr16 #(fp64Pkg::FMSB+FADD) u2 (.clk(clk), .ld(ld1), .a({3'b0,fracta,8'b0}), .b({3'b0,fractb,8'b0}), .q(divo), .r(), .done(done1), .lzcnt(lzcnt));
-//fpdivr2 #(FMSB+FADD) u2 (.clk4x(clk4x), .ld(ld), .a({3'b0,fracta,8'b0}), .b({3'b0,fractb,8'b0}), .q(divo), .r(), .done(done1), .lzcnt(lzcnt));
-wire [(fp64Pkg::FMSB+FADD)*2-1:0] divo1 = divo[(fp64Pkg::FMSB+FADD)*2-1:0] << (lzcnt-2);
-`else
-DivGoldschmidt #(.WID(fp64Pkg::FMSB+6),.WHOLE(1),.POINTS(fp64Pkg::FMSB+5))
-	u2 (.rst(rst), .clk(clk), .ld(ld1), .a({fracta,4'b0}), .b({fractb,4'b0}), .q(divo), .done(done1), .lzcnt(lzcnt));
-wire [(fp64Pkg::FMSB+6)*2+1:0] divo1 =
-	lzcnt > 8'd5 ? divo << (lzcnt-8'd6) :
-	divo >> (8'd6-lzcnt);
-	;
-`endif
+generate begin : gStyle
+case(STYLE)
+0:
+	begin	
+		fpdivr2 #(FMSB+FADD) u2 (.clk(clk), .ld(ld), .a({3'b0,fracta,8'b0}), .b({3'b0,fractb,8'b0}), .q(divo), .r(), .done(done1), .lzcnt(lzcnt));
+		assign divo1 = divo[(FMSB+FADD)*2-1:0] << (lzcnt-2);
+	end
+4:
+	begin
+		fpdivr16 #(FMSB+FADD) u2 (.clk(clk), .ld(ld1), .a({3'b0,fracta,8'b0}), .b({3'b0,fractb,8'b0}), .q(divo), .r(), .done(done1), .lzcnt(lzcnt));
+		assign divo1 = divo[(FMSB+FADD)*2-1:0] << (lzcnt-2);
+	end
+32:
+	begin
+		DivGoldschmidt #(.WID(FMSB+6),.WHOLE(1),.POINTS(FMSB+5))
+		u2 (.rst(rst), .clk(clk), .ld(ld1), .a({fracta,4'b0}), .b({fractb,4'b0}), .q(divogs), .done(done1), .lzcnt(lzcnt));
+		assign divo1gs = lzcnt > 8'd5 ? divogs << (lzcnt-8'd6) : divogs >> (8'd6-lzcnt);
+	end
+endcase
+end
+endgenerate
 ft_delay #(.WID(1), .DEP(3)) u3 (.clk(clk), .ce(ce), .i(done1), .o(done3));
 
 // -----------------------------------------------------------
@@ -145,12 +158,17 @@ ft_delay #(.WID(1), .DEP(3)) u3 (.clk(clk), .ce(ce), .i(done1), .o(done3));
 reg [fp64Pkg::EMSB+2:0] ex1;	// sum of exponents
 reg qNaNOut;
 
-always_ff @(posedge clk)
-`ifndef GOLDSCHMIDT
-  if (ce) ex1 <= (xa|(a_dn&~az)) - (xb|(b_dn&~bz)) + bias + fp64Pkg::FMSB + (FADD-1) - lzcnt - 8'd1;
-`else
-  if (ce) ex1 <= (xa|(a_dn&~az)) - (xb|(b_dn&~bz)) + bias + fp64Pkg::FMSB - lzcnt + 8'd4;
-`endif
+generate begin : gEx
+case(STYLE)
+32:
+	always_ff @(posedge clk)
+	  if (ce) ex1 <= (xa|(a_dn&~az)) - (xb|(b_dn&~bz)) + bias + FMSB - lzcnt + 8'd4;
+default:
+	always_ff @(posedge clk)
+  	if (ce) ex1 <= (xa|(a_dn&~az)) - (xb|(b_dn&~bz)) + bias + FMSB + (FADD-1) - lzcnt - 8'd1;
+endcase
+end
+endgenerate
 
 always_ff @(posedge clk)
   if (ce) qNaNOut <= (az&bz)|(aInf&bInf);
@@ -171,6 +189,7 @@ always_ff @(posedge clk)
 // -----------------------------------------------------------
 // Clock #N+3
 // -----------------------------------------------------------
+
 always_ff @(posedge clk)
 // Simulation likes to see these values reset to zero on reset. Otherwise the
 // values propagate in sim as X's.
@@ -211,11 +230,11 @@ else if (ce) begin
 		8'b000001??:	mo <= 1'd0;	// Inf exponent
 		8'b0000001?:	mo <= {1'b1,qNaN|fp64Pkg::QINFDIV,{fp64Pkg::FMSB+1{1'b0}}};	// infinity / infinity
 		8'b00000001:	mo <= {1'b1,qNaN|fp64Pkg::QZEROZERO,{fp64Pkg::FMSB+1{1'b0}}};	// zero / zero
-`ifndef GOLDSCHMIDT
-		default:		mo <= divo1[(fp64Pkg::FMSB+FADD)*2-1:(FADD-2)*2-2];	// plain div
-`else
-		default:		mo <= divo1[(fp64Pkg::FMSB+6)*2+1:2];	// plain div
-`endif
+		default:
+			if (STYLE==32)
+				mo <= divo1gs[(FMSB+6)*2+1:2];
+			else
+				mo <= divo1[(FMSB+FADD)*2-1:(FADD-2)*2-2];
 		endcase
 
 		so  		<= sa ^ sb;
@@ -225,12 +244,13 @@ else if (ce) begin
 	end
 end
 
+assign o = {so,xo,mo};
+
 endmodule
 
-module fpDivide64nr(rst, clk, clk4x, ce, ld, op, a, b, o, rm, done, sign_exe, inf, overflow, underflow);
+module fpDivide64nr(rst, clk, ce, ld, op, a, b, o, rm, done, sign_exe, inf, overflow, underflow);
 input rst;
 input clk;
-input clk4x;
 input ce;
 input ld;
 input op;
@@ -248,13 +268,38 @@ wire sign_exe1, inf1, overflow1, underflow1;
 wire FP64N fpn0;
 wire done1;
 
-fpDivide64    u1 (rst, clk, clk4x, ce, ld, op, a, b, o1, done1, sign_exe1, overflow1, underflow1);
-fpNormalize64 u2(.clk(clk), .ce(ce), .under_i(underflow1), .i(o1), .o(fpn0) );
-fpRound64     u3(.clk(clk), .ce(ce), .rm(rm), .i(fpn0), .o(o) );
+fpDivide64 u1 (
+	.rst(rst),
+	.clk(clk),
+	.ce(ce),
+	.ld(ld),
+	.op(op),
+	.a(a),
+	.b(b),
+	.o(o1),
+	.done(done1),
+	.sign_exe(sign_exe1),
+	.overflow(overflow1),
+	.underflow(underflow1)
+);
+fpNormalize64L8 u2 (
+	.clk(clk),
+	.ce(ce),
+	.i(o1),
+	.o(fpn0),
+	.under_i(underflow1),
+	.under_o(),
+	.inexact_o()
+);
+fpRoundL3 #(
+	.MSB(fp64Pkg::MSB),
+	.EMSB(fp64Pkg::EMSB),
+	.FMSB(fp64Pkg::FMSB)
+)
+u3(.clk(clk), .ce(ce), .rm(rm), .i(fpn0), .o(o) );
 delay2      #(1)   u4(.clk(clk), .ce(ce), .i(sign_exe1), .o(sign_exe));
 delay2      #(1)   u5(.clk(clk), .ce(ce), .i(inf1), .o(inf));
 delay2      #(1)   u6(.clk(clk), .ce(ce), .i(overflow1), .o(overflow));
 delay2      #(1)   u7(.clk(clk), .ce(ce), .i(underflow1), .o(underflow));
 delay2		  #(1)   u8(.clk(clk), .ce(ce), .i(done1), .o(done));
 endmodule
-

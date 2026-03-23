@@ -8,7 +8,7 @@
 //	fpFMA64L30.sv
 //		- floating point fused multiplier + adder
 //		- can issue every clock cycle
-//		- latency of five
+//		- latency of 40
 //		- IEEE 754 representation
 //
 //
@@ -38,7 +38,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// 3600 LUTs / 3900 FFs / 9 DSPs                                                                          
+// 3300 LUTs / 4010 FFs / 9 DSPs / 300 MHz
 // ============================================================================
 
 import fp64Pkg::*;
@@ -737,7 +737,21 @@ fpNormalize64L8 u2
 	.inexact_o(norm_inexact)
 );
 vtdl #(.WID(3),.DEP(64)) u8 (.clk(clk), .ce(ce), .d(rm), .q(rm6), .a(6'd38));
-fpRound64L3 u3(.clk(clk), .ce(ce), .rm(rm6), .i(fpn0), .o(o) );
+
+fpRoundL3 
+#(
+	.MSB(fp64Pkg::MSB),
+	.EMSB(fp64Pkg::EMSB),
+	.FMSB(fp64Pkg::FMSB)
+)
+u3 (
+	.clk(clk),
+	.ce(ce),
+	.rm(rm6),
+	.i(fpn0),
+	.o(o)
+);
+
 fpDecomp64 u4(.i(o), .xz(), .vz(zero), .inf(inf));
 vtdl #(.WID(1)) u5 (.clk(clk), .ce(ce), .a(4'd11), .d(fma_underflow), .q(underflow));
 vtdl #(.WID(1)) u6 (.clk(clk), .ce(ce), .a(4'd11), .d(fma_overflow), .q(overflow));
@@ -745,4 +759,3 @@ delay1		#(1)	u7 (.clk(clk), .ce(ce), .i(norm_inexact), .o(inexact));
 //assign overflow = inf;
 
 endmodule
-
