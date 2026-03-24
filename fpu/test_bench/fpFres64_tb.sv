@@ -1,7 +1,7 @@
 `timescale 1ns / 1ps
 // ============================================================================
 //        __
-//   \\__/ o\    (C) 2018-2023  Robert Finch, Waterloo
+//   \\__/ o\    (C) 2018-2026  Robert Finch, Waterloo
 //    \  __ /    All rights reserved.
 //     \/_//     robfinch<remove>@finitron.ca
 //       ||
@@ -37,6 +37,8 @@
 //                                                                          
 // ============================================================================
 
+import fp64Pkg::*;
+
 module bits_same(a, b, o);
 input [63:0] a;
 input [63:0] b;
@@ -59,15 +61,15 @@ reg clk;
 reg clk2x;
 reg clk4x;
 reg [12:0] adr;
-reg [191:0] memd [0:8191];
+reg [191:0] memd [0:9000];
 reg [127:0] memdo [0:9000];
 reg [127:0] memdo1 [0:9000];
 reg [31:0] a,a6;
-reg [63:0] ad,cc;
+reg [63:0] ad,bd,cc;
 reg [63:0] bitdif;
-real cd,aa,oa;
+real cd,aa,bb,oa;
 reg [63:0] lg,mbit;
-real dif,pdif,bdif;
+real dif,pdif,bdif,maxerr;
 wire [31:0] a5;
 wire [31:0] o;
 wire [63:0] od;
@@ -78,6 +80,7 @@ wire done;
 reg [3:0] state;
 reg [7:0] count;
 wire [7:0] bs;
+wire exact,exact2;
 integer outfile;
 
 initial begin
@@ -85,7 +88,7 @@ initial begin
 	clk = 1'b0;
 	clk2x = 1'b0;
 	clk4x = 0;
-	$readmemh("f:/cores2023/Float/fpu/test_bench/data/fpFres64_tv.txt", memd);
+	$readmemh("c:/f/f/cores2024/Float/fpu/test_bench/data/fpFres64_tv.txt", memd);
 	#20 rst = 1;
 	#50 rst = 0;
 end
@@ -102,6 +105,7 @@ if (rst) begin
 	count <= 0;
 	mbit <= 64;
 	bdif <= 64.0;
+	maxerr = 0.0;
 	lg = 64;
 end
 else
@@ -114,11 +118,12 @@ case(state)
 4'd1:
 	begin
 		if (adr==0) begin
-    	outfile = $fopen("f:/cores2023/Float/fpu/test_bench/fpRes64_tvo.txt", "wb");
-    	$fwrite(outfile, "------ A ------  ------ INV -----  ---- SIM INV ----  percent err \n");
+    	outfile = $fopen("c:/f/f/cores2024/Float/fpu/test_bench/fpRes64_tvo.txt", "wb");
+    	$fwrite(outfile, "------ A ------  ------ INV -----  ---- SIM INV ---- x --- real --- percent err \n");
     end
 		count <= 8'd0;
-		ad <= memd[adr][63:0];
+		ad <= 64'h3FF0000000000000;	// +1.0
+		bd <= memd[adr][63:0];
 		ld <= 1'b1;
 		state <= 2;
 	end
@@ -126,15 +131,17 @@ case(state)
 	begin
 		if (count==8'd2) begin
 			aa = $bitstoreal(ad);
-			cd <= 1.0 / aa;
-			cc <= $realtobits(1.0/aa);
+			bb = $bitstoreal(bd);
+			cd <= 1.0 / bb;
+			cc <= $realtobits(1.0/bb);
 		end
 		count <= count + 2'd1;
 		if (count==8'd16) begin
 			memdo[adr] <= {od,ad};
-			memdo1[adr] <= {$realtobits(cd),ad};
+			memdo1[adr] <= {$realtobits(cd),bd};
 			adr <= adr + 1;
 			if (adr==8191) begin
+			  $fwrite(outfile, "maxerr = %3.4f\n", maxerr);
 				$fclose(outfile);
 //				$writememh("f:/cores2023/Float/fpu/test_bench/data/fpFres64_dut_tvo.txt", memdo);
 //				$writememh("f:/cores2023/Float/fpu/test_bench/data/fpFres64_tb_tvo.txt", memdo1);
@@ -145,9 +152,11 @@ case(state)
 			dif = cd>oa ? cd-oa : oa-cd;
 			bitdif = cd>oa ? cc-od : od-cc;
 			pdif = (dif/cd) * 100.0;
+			if (pdif > maxerr)
+				maxerr = pdif;
 			bdif <= (pdif > 0.0) ? mbit - $clog2($rtoi(dif)) : 0;
 			lg = 53-$clog2(bitdif);
-		  $fwrite(outfile, "%h\t%h\t%h\t%3.4f\n", ad, od, cc, pdif);
+		  $fwrite(outfile, "%h\t%h\t%h\t%h\t%3.4f\n", bd, od, cc, exact2, pdif);
 		end
 	end
 4'd3:	state <= 4;
@@ -156,7 +165,8 @@ case(state)
 endcase
 end
 
-fpRes64 u2 (clk, 1'b1, ad, od);//, sign_exe, inf, overflow, underflow);
+fpRes64 u2 (clk, 1'b1, ad, bd, od, exact);//, sign_exe, inf, overflow, underflow);
+delay2 u4 (clk, 1'b1, exact, exact2);
 bits_same u3(cc, od, bs);
 
 endmodule
