@@ -48,12 +48,12 @@ parameter QSQRTNEG	= 4'd6;
 `define QSQRTINFS	31'h7FC00005	// - square root of infinity
 `define QSQRTNEGS	31'h7FC00006	// - square root of negaitve number
 */
-`define	QSUBINFS	31'h7FC20000	// - infinity - infinity
-`define QINFDIVS	31'h7FC40000	// - infinity / infinity
-`define QZEROZEROS	31'h7FC60000	// - zero / zero
-`define QINFZEROS	31'h7FC80000	// - infinity X zero
-`define QSQRTINFS	31'h7FCA0000	// - square root of infinity
-`define QSQRTNEGS	31'h7FCC0000	// - square root of negaitve number
+`define	QSUBINFS	31'h7FC40000	// - infinity - infinity
+`define QINFDIVS	31'h7FC80000	// - infinity / infinity
+`define QZEROZEROS	31'h7FCC0000	// - zero / zero
+`define QINFZEROS	31'h7FD00000	// - infinity X zero
+`define QSQRTINFS	31'h7FD40000	// - square root of infinity
+`define QSQRTNEGS	31'h7FD80000	// - square root of negative number
 
 `define	QINFOD		52'hFF80000000000		// info
 /*
@@ -64,12 +64,12 @@ parameter QSQRTNEG	= 4'd6;
 `define QSQRTINFD	63'h7FF0000000000005	// - square root of infinity
 `define QSQRTNEGD	63'h7FF0000000000006	// - square root of negaitve number
 */
-`define	QSUBINFD 	63'h7FF08000_00000000	// - infinity - infinity
-`define QINFDIVD 	63'h7FF10000_00000000	// - infinity / infinity
-`define QZEROZEROD  63'h7FF18000_00000000	// - zero / zero
-`define QINFZEROD	63'h7FF20000_00000000	// - infinity X zero
-`define QSQRTINFD	63'h7FF28000_00000000	// - square root of infinity
-`define QSQRTNEGD	63'h7FF30000_00000000	// - square root of negaitve number
+`define	QSUBINFD 	63'h7FF88000_00000000	// - infinity - infinity
+`define QINFDIVD 	63'h7FF90000_00000000	// - infinity / infinity
+`define QZEROZEROD  63'h7FF98000_00000000	// - zero / zero
+`define QINFZEROD	63'h7FFA0000_00000000	// - infinity X zero
+`define QSQRTINFD	63'h7FFA8000_00000000	// - square root of infinity
+`define QSQRTNEGD	63'h7FFB0000_00000000	// - square root of negaitve number
 
 `define	QINFODX		64'hFF800000_00000000		// info
 /*
