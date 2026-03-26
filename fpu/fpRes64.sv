@@ -34,14 +34,17 @@
 //
 // exact indicates that no further approximation is required. This could be due
 // to special values like divide by zero.
+//
+// 500 LUTs / 220 FFs
 // ============================================================================
 //
 import fp64Pkg::*;
 
-module fpRes64(clk, ce, a, b, o, exact);
+module fpRes64(clk, ce, dc, a, b, o, exact);
 localparam EMSB = fp64Pkg::EMSB;
 input clk;
 input ce;
+input dc;						// divide checks
 input FP64 a;
 input FP64 b;
 output FP64 o;
@@ -588,16 +591,16 @@ wire signed [EMSB+1:0] exn = nanb ? xb : bias - x1;					// make exponent negativ
 wire sb3;
 wire signed [EMSB+1:0] exp3;
 wire [9:0] index = mb[fp64Pkg::FMSB:fp64Pkg::FMSB-8];
-reg [21:0] k0, k1;
+reg [21:0] k0;
 
 always_ff @(posedge clk)
 if (ce) begin
 	sel_ox <= 1'b0;
-	if (nana & nanb) begin
+	if (dc & nana & nanb) begin
 		ox <= a|64'h00080000_00000000;
 		sel_ox <= 1'b1;
 	end
-	else if (nana) begin
+	else if (dc && nana) begin
 		ox <= a|64'h00080000_00000000;
 		sel_ox <= 1'b1;
 	end
@@ -605,34 +608,40 @@ if (ce) begin
 		ox <= b|64'h00080000_00000000;
 		sel_ox <= 1'b1;
 	end
-	else if (vza & vzb) begin
+	else if (dc & vza & vzb) begin
 		ox <= {sb,63'h7FF98000_00000000};	// zero/zero
-		sel_ox <= 1'b1;
-	end
-	else if (infa & infb) begin
-		ox <= {sb,63'h7FF90000_00000000};	// - infinity / infinity
 		sel_ox <= 1'b1;
 	end
 	else if (vzb) begin
 		ox <= {sb,63'h7FF00000_00000000};	// n/zero = infinity
 		sel_ox <= 1'b1;
 	end
+	else if (dc & infa & infb) begin
+		ox <= {sb,63'h7FF90000_00000000};	// - infinity / infinity
+		sel_ox <= 1'b1;
+	end
+	else if (infb) begin
+		ox <= {sb,63'h00000000_00000000};	// 1/infinity = zero
+		sel_ox <= 1'b1;
+	end
+	else if (mbz) begin
+		ox.sign <= sb;
+		ox.exp <= exn;
+		ox.sig <= 52'd0;
+		sel_ox <= 1'b1;
+	end
 end
 
 always_comb
 	k0 = {1'b1,cres[index][20:0]};
-always_comb
-	k1 = {1'b1,cres[index+2'd1][20:0]};
 delay1 #(fp64Pkg::EMSB+2) u3 (.clk(clk), .ce(ce), .i(exp), .o(exp3));
 delay1 #(1) u4 (.clk(clk), .ce(ce), .i(sb), .o(sb3));
-wire [8:0] eps = ma[fp64Pkg::FMSB-9:fp64Pkg::FMSB-9-9];
-wire [30:0] p = k1 * eps;
 reg [21:0] r0;
-reg [21:-2] r1;
+reg [21:-14] r1;
 always_ff @(posedge clk)
-	if(ce) r0 <= k0 - (p >> 5'd18);
+	if (ce) r0 <= k0;
 always_comb
-	r1 = exp3=='d0 ? r0 >> 2'd1 : exp3[fp64Pkg::EMSB+1] ? r0 >> (-exp3 + 1): r0;
+	r1 = (exp3=='d0 || exp3[fp64Pkg::EMSB+1]) ? {r0,12'h0} >> (-exp3 + 1): {r0,12'h0};
 always_ff @(posedge clk)
 	if (ce) mb3 <= mb;
 always_ff @(posedge clk)
@@ -647,7 +656,7 @@ always_ff @(posedge clk)
 		else begin
 			o.sign <= sb3;
 			o.exp <= exp3[fp64Pkg::EMSB+1] ? 'd0 : exp3;
-			o.sig <= nanb3 ? mb3 : {r1[21:-2],{fp64Pkg::FMSB-20{1'b0}}};
+			o.sig <= nanb3 ? mb3 : {r1[21:-14],{fp64Pkg::FMSB-32{1'b0}}};
 			exact <= 1'b0;
 		end
 	end
