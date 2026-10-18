@@ -69,7 +69,7 @@ parameter QSQRTNEG	= 4'd6;
 `define QZEROZEROD  63'h7FF98000_00000000	// - zero / zero
 `define QINFZEROD	63'h7FFA0000_00000000	// - infinity X zero
 `define QSQRTINFD	63'h7FFA8000_00000000	// - square root of infinity
-`define QSQRTNEGD	63'h7FFB0000_00000000	// - square root of negaitve number
+`define QSQRTNEGD	63'h7FFB0000_00000000	// - square root of negative number
 
 `define	QINFODX		64'hFF800000_00000000		// info
 /*

@@ -43,6 +43,7 @@ module fpConstROM64(a, o);
 input [6:0] a;
 output FP64 o;
 
+(* ram_style="distributed" *)
 FP64 [127:0] fconst;
 
 initial begin
@@ -212,12 +213,14 @@ fconst[118] = $realtobits(0.56817302698551221787e-1);
 fconst[119] = $realtobits(0.50000000000000000000e+0);
 //static const double hugexp = (double)HUGE_EXP;
 
-fconst[120]=64'h7FF88000_00000000;	// - infinity - infinity
-fconst[121]=64'h7FF90000_00000000;	// - infinity / infinity
-fconst[122]=64'h7FF98000_00000000;	// - zero / zero
-fconst[123]=64'h7FFA0000_00000000;	// - infinity X zero
-fconst[124]=64'h7FFA8000_00000000;	// - square root of infinity
-fconst[125]=64'h7FFB0000_00000000;	// - square root of negative number
+fconst[120]=64'h7FF00000_00000000;	// infinity
+// NaNs follow
+fconst[121]=64'h7FF88000_00000000;	// - infinity - infinity
+fconst[122]=64'h7FF90000_00000000;	// - infinity / infinity
+fconst[123]=64'h7FF98000_00000000;	// - zero / zero
+fconst[124]=64'h7FFA0000_00000000;	// - infinity X zero
+fconst[125]=64'h7FFA8000_00000000;	// - square root of infinity
+fconst[126]=64'h7FFB0000_00000000;	// - square root of negative number
 
 /*
 // Taken from
